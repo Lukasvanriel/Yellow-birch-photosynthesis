@@ -1,0 +1,90 @@
+---
+title           : "Differential photosynthetic capacity and carbon allocation strategies in yellow birch in Quebec"
+shorttitle      : "My preregistration"
+date            : "`r Sys.setlocale('LC_TIME', 'C'); format(Sys.time(), '%d\\\\. %B %Y')`"
+
+author: 
+  - name        : Lukas Van Riel
+    affiliation : 1
+  - name        : Francois Girard
+    affiliation : 2
+  - name        : Marie-Hélène Brice
+    affiliation : 1
+  - name        : Mathieu Bouchard
+    affiliation : 3
+
+affiliation:
+  - id          : 1
+    institution : Département de sciences Biologiques, Université de Montréal, Montréal, Québec, Canada
+  - id          : 2
+    institution : Département de Géographie, Université de Montréal, Montréal, Québec, Canada
+  - id          : 3
+    institution : Département des sciences du Bois et de la Foret, Université Laval, Québec City, Canada
+
+output: prereg::prereg_pdf
+bibliography: references.bib
+---
+
+<!-- To keep pre-registrations to a reasonable length for readers, we recommend answers fit within a single page .pdf document, roughly 3200 characters. Read more about this here: https://aspredicted.org/messages/why_limits.php -->
+
+## Data collection
+
+<!-- Have any data been collected for this study already? (Note: "Yes" is not an accepted answer.) -->
+
+No data have been collected for this study yet.
+
+## Hypothesis
+
+<!-- What's the main question being asked or hypothesis being tested in this study? -->
+
+-   Photosynthetic capacity decreases with latitude but never reaches zero since other factors besides climate impact the current northern limit of yellow birch.
+
+-   With increasing latitude, yellow birch individuals allocate relatively higher fractions of their producedcarbohydrates for growth, leaving less for other functions such as reproduction because the environmental conditions become gradually less suited for photosynthesis when moving northward.
+
+## Data collection procedures
+
+<!-- Describe the key dependent variable(s) specifying how they will be measured. -->
+
+At each plot, photosynthetic gas exchange measurements will be carried out for 5 different yellow birch saplings and adults (dbh = 1-9 cm), using the LI-6800 Portable Photosynthesis System (Li-Cor Inc., Lincoln, NE, USA) with the RACiR method [@stinziano2017]. Measurements will be carried out in a closed chamber to control for weather conditions such as temperature [aiming for 25 °C, @dally-bélanger2022] and air moisture content.To complement the RACiR measurements and make comparisons between leaves easier (e.g. through NDVI), a field spectroradiometer (PSR-3500 Spectral Evolution Inc.) will be used to measure the spectral properties of each sampled leaf. Next, the diameter at breast height of each sampled tree will be measured and a core sample taken to determine the radial growth rate. All trees in the plot will be mapped and the plot canopy openness measured using a LAI-2200C Plant Canopy Analyzer (Li-Cor Inc., Lincoln, NE, USA). A soil sample will be taken that will be analysed in the lab to consider any soil variability.
+
+Every site will be visited throughout the summer of 2024. All Vc,max and Jmax measurements will be taken in a short period of time at the end of summer to ensure leaf maturity. Weather conditions will be controlled for as much as possible, aiming for clear skies 5 days before and during measurements.
+
+## Analyses
+
+<!-- Specify exactly which analyses you will conduct to examine the main question/hypothesis. -->
+
+The obtained A-Ci curves will be corrected by the plot's baseline curves [based on measurements in an empty chamber, @stinziano2017]. Next, all individual, corrected, curves will be fit in order to extract the values for Vc,max and Jmax [@dally-bélanger2022]. This is straightforward when using the plantecophys package [@duursma2015], 16 developed for the R environment [@rcoreteam2022]. The other relevant parameters to estimate CO2 assimilation rates (mesophyll conductance gm, dark respiration Rd and photorespiratory compensation point $\Gamma$\*) typically show little phenotypic variation and can be derived from literature [@farquhar1980]. Tree ring width will be prepared and measured using standard methods [@swetnam1985] and subsequently converted to basal area increments using the tree diameter.
+
+In case of data normality, a multi-way ANOVA test [and possibly Tukey tests, @abdi2010] will be carried out to assess the significance of latitude on Vc,max and Jmax. Contrasting ratios of Vc,max (or Jmax) and basal area increments with latitude will allow to determine the different carbon allocation strategies of yellow birch over its range in Quebec. Lastly, the derived Jmax and Vc,max values will be used to model photosynthesis capacity for sampled individuals under future climatic conditions (e.g. temperature, VPD, atmospheric CO2), to corroborate the projections in my third study using the Photosyn function of the plantecophys package.
+
+## Outliers and exclusions
+
+<!-- Describe exactly how outliers will be defined and handled, and your precise rule(s) for excluding observations. -->
+
+Individuals that yield Vcmax and/or Jmax values that lie outside the reported values in literature by more than 2$\sigma$ will be discarded.
+
+Subjects missing data will be included until they miss so much the fitting is no longer acceptable
+
+## Sample size
+
+<!-- How many observations will be collected or what will determine sample size? No need to justify decision, but be precise about _exactly_ how the number will be determined. -->
+
+75 adult and 75 juvenile individuals (5 sites x 3 plots/site x 5 individuals/plot).
+
+This design allowed to maximise the sample size with the available time and funds.
+
+## Study type
+
+Field Survey
+
+# References
+
+## 
+
+```{=tex}
+\vspace{-2pc}
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{-1in}
+\setlength{\parskip}{8pt}
+```
+\noindent

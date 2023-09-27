@@ -2,7 +2,7 @@
 title: Differential photosynthetic capacity and carbon allocation strategies in yellow birch in Quebec
 author: "Lukas Van Riel"
 date: "2023-09-28"
-csl: ../04_manuscripts/ecology-letters.csl
+csl: References/ecology-letters.csl
 bibliography: references.bib
 link-citations: true
 output:
@@ -56,7 +56,7 @@ In case of data normality, a multi-way ANOVA test [and possibly Tukey tests, @ab
 
 The fitting procedure is illustrated in the following figure.
 
-![Leaf photosynthesis---CO2 response curve as modelled with the FvCB model. Black dots represent the gas exchange measurements. The blue curve represents the fitted gross photosynthesis rate when Rubisco activity is limiting, the red curve when RuBP-regeneration is limiting. The resulting best fit line (black) is the minimal of both curves.](images/Single_plot.png)
+![Leaf photosynthesis---CO2 response curve as modelled with the FvCB model. Black dots represent the gas exchange measurements. The blue curve represents the fitted gross photosynthesis rate when Rubisco activity is limiting, the red curve when RuBP-regeneration is limiting. The resulting best fit line (black) is the minimal of both curves.](images/VanRiel_Single_plot.png){width="700"}
 
 ## Parameter output
 
@@ -85,9 +85,9 @@ The one-way ANOVA analyses revealed that there was no significant difference for
 
 This can also be seen in the following two figures that display the Vcmax and Jmax distributions grouped by life stage.
 
-![Boxplot of the Vcmax values, grouped by life stage. 0 refers to juvenile trees, 1 to adult trees.](images/Vcmax_boxplot.png){width="400"}
+![Boxplot of the Vcmax values, grouped by life stage. 0 refers to juvenile trees, 1 to adult trees.](images/VanRiel_Vcmax_boxplot.png){width="400"}
 
-![Boxplot of the Jmax values, grouped by life stage. 0 refers to juvenile trees, 1 to adult trees.](images/Jmax_boxplot.png){width="400"}
+![Boxplot of the Jmax values, grouped by life stage. 0 refers to juvenile trees, 1 to adult trees.](images/VanRiel_Jmax_boxplot.png){width="400"}
 
 # Discussion
 
