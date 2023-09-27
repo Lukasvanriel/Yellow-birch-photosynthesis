@@ -14,10 +14,11 @@ library(here) # For convenient pathing
 
 
 ### Create raw data --------------------------------------------------------------
-# For this project I will use data similar to the manyacidat dataset of the plantecophys package
+# For this mock project I will use data similar to the manyacidat dataset of the plantecophys package
 raw.data <- plantecophys::manyacidat
 
-# For the sake of this mock project, I will randomly identify trees as adult/juvenile
+# In order to mimick with this project what I eventually want to do with real field data,
+# I will randomly identify trees as adult/juvenile
 raw.data <- raw.data %>% 
   mutate(adult = ifelse(treatment %in% c(1000, 5, 10, 15), 1, 0)) %>% 
   select(-treatment)
