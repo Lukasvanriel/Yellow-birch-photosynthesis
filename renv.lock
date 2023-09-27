@@ -596,6 +596,22 @@
       ],
       "Hash": "d6db1667059d027da730decdc214b959"
     },
+    "grateful": {
+      "Package": "grateful",
+      "Version": "0.2.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "knitr",
+        "remotes",
+        "renv",
+        "rmarkdown",
+        "rstudioapi",
+        "utils"
+      ],
+      "Hash": "ea8943696bc3ceeb30fb3026f4d953ca"
+    },
     "gtable": {
       "Package": "gtable",
       "Version": "0.3.4",
@@ -1096,6 +1112,20 @@
       ],
       "Hash": "76c9e04c712a05848ae7a23d2f170a40"
     },
+    "remotes": {
+      "Package": "remotes",
+      "Version": "2.4.2.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "methods",
+        "stats",
+        "tools",
+        "utils"
+      ],
+      "Hash": "63d15047eb239f95160112bcadc4fcb9"
+    },
     "renv": {
       "Package": "renv",
       "Version": "1.0.2",
@@ -1179,22 +1209,6 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "5564500e25cffad9e22244ced1379887"
-    },
-    "rticles": {
-      "Package": "rticles",
-      "Version": "0.25",
-      "Source": "Repository",
-      "Repository": "RSPM",
-      "Requirements": [
-        "knitr",
-        "lifecycle",
-        "rmarkdown",
-        "tinytex",
-        "utils",
-        "xfun",
-        "yaml"
-      ],
-      "Hash": "9d0dabda18a76c9f08a89eafa7cce731"
     },
     "rvest": {
       "Package": "rvest",

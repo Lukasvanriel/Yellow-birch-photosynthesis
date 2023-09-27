@@ -3,12 +3,17 @@ title: Differential photosynthetic capacity and carbon allocation strategies in 
 author: "Lukas Van Riel"
 date: "2023-09-28"
 csl: References/ecology-letters.csl
-bibliography: references.bib
+bibliography: [references.bib, References/grateful-refs.bib]
 link-citations: true
 output:
   pdf_document:
     latex_engine: xelatex
 ---
+
+```{r setup, include=FALSE, echo=FALSE}
+library(grateful)
+get_pkgs_info(out.dir= "References/")
+```
 
 # Abstract
 
