@@ -96,8 +96,8 @@ This can also be seen in the following two figures that display the Vcmax and Jm
 
 # Discussion
 
-Our results show no differences in the Vcmax values between the sampled adults and juvenile yellow birch trees and only weakly significant differences between the life stages for Jmax. This is not what was expected based on other studies[see e.g., @boisvert-marsh2019]. This might stem from the fact that the northern limit of the yellow birch distribution is already trailing so much behind its climatic niche that the juveniles do not experience negative conditions for growth [@collier2022].
+Our results show no differences in the Vcmax and Jmax values between the sampled adults and juvenile yellow birch trees. This is not what was expected based on other studies[see e.g., @boisvert-marsh2019]. This might stem from the fact that the northern limit of the yellow birch distribution is already trailing so much behind its climatic niche that the juveniles do not experience negative conditions for growth [@collier2022].
 
-More expansion on discussion of results and their implications will to come.
+TODO: Expand on discussion of results and their implications.
 
 # References
