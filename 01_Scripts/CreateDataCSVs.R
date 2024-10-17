@@ -231,3 +231,50 @@ ggplot(data) +
 ggplot(data) +
   geom_boxplot(aes(y=Vcmax, x=Bin, colour = Class))
 
+#!!!
+ggplot(data) +
+  geom_boxplot(aes(y=Vcmax, x=Bin, colour = Method))
+
+# Run some anova's
+install.packages("car")
+library(car)
+
+aov_Va <- aov(Vcmax ~ Bin,
+                         data = data %>% filter(Class=="adult"))
+summary(aov_Va)
+ggplot(data %>% filter(Class=="adult")) +
+  geom_boxplot(aes(y=Vcmax, x=Bin))
+
+aov_Vs <- aov(Vcmax ~ Bin,
+              data = data %>% filter(Class=="sapling"))
+summary(aov_Vs)
+ggplot(data %>% filter(Class=="sapling")) +
+  geom_boxplot(aes(y=Vcmax, x=Bin))
+
+aov_Ja <- aov(Jmax ~ Bin,
+              data = data %>% filter(Class=="adult"))
+summary(aov_Ja)
+ggplot(data %>% filter(Class=="adult")) +
+  geom_boxplot(aes(y=Jmax, x=Bin))
+
+aov_Js <- aov(Jmax ~ Bin,
+              data = data %>% filter(Class=="sapling"))
+summary(aov_Js)
+ggplot(data %>% filter(Class=="sapling")) +
+  geom_boxplot(aes(y=Jmax, x=Bin))
+
+
+
+
+shapiro.test(aov_Va$residuals)
+hist(aov_Va$residuals)
+par(mfrow = c(1, 2)) # combine plots
+
+# histogram
+hist(aov_Va$residuals)
+
+# QQ-plot
+qqPlot(aov_Va$residuals,
+       id = FALSE # id = FALSE to remove point identification
+)
+
