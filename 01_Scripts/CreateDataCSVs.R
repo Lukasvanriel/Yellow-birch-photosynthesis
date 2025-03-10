@@ -6,20 +6,47 @@
 library(tidyverse)
 library(conflicted)
 
+#### 0 - Basic permutations #### 
+## Diameters
+data.diam <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/Tree_diameters-wide.csv")
+diam <- data.diam %>% 
+  pivot_longer(cols = -Plot, values_to = "diameter") %>% 
+  mutate(tree = paste(Plot, ifelse(substring(name, 1, 1) == "a", substring(name, nchar(name), nchar(name)),
+                                   as.character(as.numeric(substring(name, nchar(name), nchar(name))) + 5)),
+                      sep="-"),
+         diameter = 10 * diameter) %>% 
+  relocate(tree, .before = diameter) %>% 
+  select(tree, diameter)
+  
+write_csv(diam, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Tree_diameters.csv")
+
+## Tree community
+tree.comm.long <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Community-dbh.csv")
+
+tree.comm <- tree.comm.long %>% 
+  mutate(Diameter = 10 * Diameter) %>% 
+  mutate(A = (Diameter/2)**2 * pi) %>% 
+  group_by(Plot, Species) %>% 
+  summarise(Atot = sum(A)) %>% 
+  pivot_wider(names_from = Species, values_from = Atot, values_fill = 0.0) %>% 
+  ungroup()
+
+write_csv(tree.comm, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Community-dbh.csv")
+
 #### 1 - Leaf parameters #### 
 #Load txt data file:
-data.leaf.raw <- read_table("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/Lukas-LeafData/Leaf-Scans-copy.txt")
+data.leaf.raw <- read_table("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/Lukas-LeafData/Leaf-Scans.txt")
 
 data.leaf <- data.leaf.raw %>% 
   mutate(LeafName = as.character(WinFOLIA),
-         LeafArea = as.numeric(NofLeaves), 
-         Width = as.numeric(TotLeafArea), 
-         Length = as.numeric(AvgLeafArea)) %>% 
+         LeafArea = as.numeric(AvgLeafArea), 
+         Width = as.numeric(AvgLeafHorizWidth), 
+         Length = as.numeric(AvgLeafVertLength)) %>% 
   select(LeafName, LeafArea, Width, Length)
 
 write_csv(data.leaf, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Leaf-Dimensions.csv")
 
-#### 2 -  Split Racir Data into individual measurements #### 
+#### 2 - Split Racir Data into individual measurements #### 
 library(readxl)
 library(plantecophys)
 library(racir)
@@ -200,70 +227,61 @@ parameters_df[min(which(parameters_df$Vcmax == 0)), ] <- Extract_curve_parameter
 
 
 #### 4 - Check out data #### 
-data_raw <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/parameters.csv")
+data_raw <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Parameters_fitted.csv")
 data_plot <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/Plot-info.csv")
 
 
 data <- data_raw %>% 
-  mutate(full=ID) %>% 
-  separate_wider_delim(ID, "-", names=c("Plot", "Tree")) %>% 
+  select(-Num) %>% 
+  mutate(full=tree) %>% 
+  separate_wider_delim(tree, "-", names=c("Plot", "Tree")) %>% 
+  filter(Tree != "e") %>% # drop the extra tree for now
   left_join(data_plot, by="Plot") %>% 
   separate_wider_delim(Plot, ".", names=c("Bin", "Plot")) %>% 
   mutate(Bin=factor(paste0(substring(Bin, 2,3), ".", substring(Bin, 4,4)))) %>% 
   mutate(sapling=as.numeric(Tree)%/%6) %>% 
   mutate(Class=factor(ifelse(sapling==1, "sapling", "adult"))) %>% 
-  relocate(Class, .before = Vcmax)
-
-data$Longitude
+  relocate(Class, .before = V_cmax)
 
 ggplot(data) +
-  geom_point(aes(x=Vcmax, y=Jmax, colour = Class))
+  geom_point(aes(x=V_cmax, y=J_max, colour = Class))
 
 ggplot(data) +
-  geom_point(aes(x=Latitude, y=Vcmax, colour = Class))
+  geom_point(aes(x=Latitude, y=V_cmax, colour = Class))
 
 ggplot(data) +
-  geom_point(aes(x=Latitude, y=Jmax, colour = Class))
+  geom_point(aes(x=Latitude, y=J_max, colour = Class))
 
 ggplot(data) +
-  geom_boxplot(aes(y=Jmax, x=Bin, colour = Class))
+  geom_boxplot(aes(y=J_max, x=Bin, colour = Class))
 
 ggplot(data) +
-  geom_boxplot(aes(y=Vcmax, x=Bin, colour = Class))
-
-#!!!
-ggplot(data) +
-  geom_boxplot(aes(y=Vcmax, x=Bin, colour = Method))
+  geom_boxplot(aes(y=V_cmax, x=Bin, colour = Class))
 
 # Run some anova's
-install.packages("car")
-library(car)
-
-aov_Va <- aov(Vcmax ~ Bin,
+aov_Va <- aov(V_cmax ~ Bin,
                          data = data %>% filter(Class=="adult"))
 summary(aov_Va)
 ggplot(data %>% filter(Class=="adult")) +
-  geom_boxplot(aes(y=Vcmax, x=Bin))
+  geom_boxplot(aes(y=V_cmax, x=Bin))
 
-aov_Vs <- aov(Vcmax ~ Bin,
+aov_Vs <- aov(V_cmax ~ Bin,
               data = data %>% filter(Class=="sapling"))
 summary(aov_Vs)
 ggplot(data %>% filter(Class=="sapling")) +
   geom_boxplot(aes(y=Vcmax, x=Bin))
 
-aov_Ja <- aov(Jmax ~ Bin,
+aov_Ja <- aov(J_max ~ Bin,
               data = data %>% filter(Class=="adult"))
 summary(aov_Ja)
 ggplot(data %>% filter(Class=="adult")) +
-  geom_boxplot(aes(y=Jmax, x=Bin))
+  geom_boxplot(aes(y=J_max, x=Bin))
 
-aov_Js <- aov(Jmax ~ Bin,
+aov_Js <- aov(J_max ~ Bin,
               data = data %>% filter(Class=="sapling"))
 summary(aov_Js)
 ggplot(data %>% filter(Class=="sapling")) +
-  geom_boxplot(aes(y=Jmax, x=Bin))
-
-
+  geom_boxplot(aes(y=J_max, x=Bin))
 
 
 shapiro.test(aov_Va$residuals)
@@ -283,42 +301,48 @@ qqPlot(aov_Va$residuals,
 data_gran <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/Granulometrie_YBP.csv",
                       col_types = c("i", "c", "c", rep("d", 15), "c", "c"))
 
-# Split some columns and drop some unimportant or constant
+# Drop unimportant columns, then average over three runs
 data_split <- data_gran %>% 
-  separate_wider_delim(Name, delim = "-", names = c("Plot", "Horizon")) %>% 
-  separate_wider_delim(Date, delim = " ", names = c("Date", "Time"))
-  
-# Create new columns for sand, silt and clay
-data_class <- data_split %>% 
+  select(-c(Measurement, Date, `Ultrason-mode`, `Ultrasons-durée`)) %>% 
+  filter(Name != "test1-test") %>% 
   mutate(clay=bin0to2, 
          silt= bin2to4 + bin4to8 + bin8to15 + bin15to31 + bin31to53,
          sand= bin53to106 + bin106to250 + bin250to500 + bin500to1000 + bin1000to2000) %>% 
   mutate(clay_n = clay/(clay+silt+sand),
          silt_n = silt/(clay+silt+sand),
-         sand_n = sand/(clay+silt+sand)) %>% 
+         sand_n = sand/(clay+silt+sand)) %>%
+  group_by(Name) %>% 
+  summarise(across(c(clay_n, silt_n, sand_n), mean))
+
+  
+# Create new columns for sand, silt and clay
+data_class <- data_split %>% 
   mutate(soil_class=ifelse(sand_n<0.50, "SiLo",
                       ifelse(sand_n<0.70, "SaLo",
-                      ifelse(sand_n<0.90, "LoSa", "Sa"))))
+                      ifelse(sand_n<0.90, "LoSa", "Sa")))) %>% 
+  separate_wider_delim(Name, names = c("Plot", "Horizon"), delim = "-")
 
-write_csv(data_class[-c(1:3),], "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Soil_Granulometrie.csv")
+# Correct 1 measurement with double measurement: P475.1-A2
+data_class$soil_class[36] <- data_class$soil_class[37]
 
-table(data_class$soil_class)
-
+write_csv(data_class, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Soil_Granulometrie.csv")
 
 #### 6 - Soil horizons description #### 
 data_soil <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/Soil-layers.csv",
                       col_types = c())
 
-data_soil_extended <- data_soil %>% 
+# Drop some of the columns (only for reference) and merge with the soil classes
+soil_merge <- data_soil %>% 
+  select(Plot, Horizon, pH, Munsell_color) %>% 
+  left_join(select(data_class, c(Plot, Horizon, soil_class)), by=c("Plot", "Horizon")) %>% 
+  relocate(soil_class, .after = Horizon) %>% 
   separate_wider_delim(Munsell_color, delim = " ", names = c("Munsell_hue", "Munsell_tosplit")) %>% 
   separate_wider_delim(Munsell_tosplit, delim = "/", names = c("Munsell_value", "Munsell_chroma"))
 
-write_csv(data_soil_extended, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Soil_Layers.csv")
+write_csv(soil_merge, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Soil_Layers.csv")
 
 #### 7 - CDendro output #### 
-library(dplR)
-
-files <- Sys.glob("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/CDendro-output/Corrected/*.rwl")
+## Functions
 
 basic_ring_analysis <- function(file) {
   #Create list to be returned by function
@@ -326,28 +350,31 @@ basic_ring_analysis <- function(file) {
   
   ## Read in the file
   if(substr(file, nchar(file)-2, nchar(file)) == "rwl") {
-    ring.data.raw <- read.rwl(file, format="tucson")
+    ring.data.raw <- read.rwl(file, format="tucson") %>% 
+      mutate(year=rownames(ring.data.raw))
   } else {if(substr(file, nchar(file)-2, nchar(file)) == "csv") {
         ring.data.raw <- read_csv(file)
       }
     }
   
-  #print(ncol(ring.data.raw))
-  
   ## Calculate age of each tree
   results$age <- ring.data.raw %>%
-    summarise(across(everything(), ~ sum(!is.na(.))))
+    pivot_longer(cols = -year, names_to = "Plot", values_to = "Width") %>% 
+    group_by(Plot) %>% 
+    mutate(non_na_flag = cumsum(! is.na(Width)) > 0) %>% 
+    filter(non_na_flag) %>%                             # Filter to include only rows after the first non-NA
+    summarise(age = n()) %>% 
+    pivot_wider(names_from = Plot, values_from = age)
   
   ## Calculate the average ring widths per decade
   # Add years and decades as columns
   ring_data <- ring.data.raw %>% 
-    mutate(Year = as.numeric(rownames(ring.data.raw)),
-           Decade = floor(Year / 10) * 10)
-  
+    mutate(Decade = floor(year / 10) * 10)
+
   # Pivot longer and summarise by decade and plot
-  results$averages <- ring_data %>%
+  results$dec_averages <- ring_data %>%
     pivot_longer(
-      cols = -c(Year, Decade), # Keep Year and Decade as identifiers
+      cols = -c(year, Decade), # Keep Year and Decade as identifiers
       names_to = "Plot",
       values_to = "Width") %>%
     group_by(Decade, Plot) %>%
@@ -357,13 +384,159 @@ basic_ring_analysis <- function(file) {
       NA_Years = sum(is.na(Width)),
       .groups = "drop" ) # Drop grouping for cleaner output
   
+  ## Get growth indices for last 10, 20 to 50 years:
+  results$growth_indices <- ring.data.raw %>% 
+    pivot_longer(cols = -year, names_to = "Plot", values_to = "Width") %>% 
+    group_by(Plot) %>% 
+    summarise(mean10 = mean(tail(Width, 10), na.rm = TRUE),
+              mean20 = mean(tail(Width, 20), na.rm = TRUE),
+              mean30 = mean(tail(Width, 30), na.rm = TRUE),
+              mean40 = mean(tail(Width, 40), na.rm = TRUE),
+              mean50 = mean(tail(Width, 50), na.rm = TRUE))
   
   ## Return ages and decadal averages as a list
   results
 }
 
+write.detrend <- function(file) {
+  plotname <- substring(basename(file), 1, 6)
+  
+  #
+  rwl <- read.rwl(file, format="tucson")
+  
+  p.rwl <- rwl %>% 
+    mutate(year = as.numeric(rownames(rwl))) %>% 
+    pivot_longer(cols = -c(year), names_to = "plot", values_to = "width") %>% 
+    dplyr::filter(! is.na(width)) %>% 
+    ggplot(aes(x = year, y = width, col = plot)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) + 
+    labs(
+      title = paste(plotname, "- Original"),
+      x = "Year",
+      y = "Width"
+    ) + 
+    theme_minimal() 
+  
+  pdf(paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/Figures/', plotname, '-Original.pdf'))
+  print(p.rwl)
+  dev.off()
+
+  # ModNegExp
+  rwi <- detrend(rwl, method = "ModNegExp")
+  
+  rwi <- mutate(rwi, year = as.numeric(rownames(rwi)))
+  
+  p.rwi <- rwi %>% 
+    pivot_longer(cols = -c(year), names_to = "plot", values_to = "width") %>% 
+    dplyr::filter(! is.na(width)) %>% 
+    ggplot(aes(x = year, y = width, col = plot)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) + 
+    labs(
+      title = paste(plotname, "- Detrended"),
+      x = "Year",
+      y = "Detrended and standardised Width"
+    ) + 
+    theme_minimal()
+  
+  pdf(paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/Figures/', plotname, '-Trends.pdf'))
+  print(p.rwi)
+  dev.off()
+  
+  lapply(names(rwl), function(x){
+    pdf(paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/Figures/', x, '-Series.pdf'))
+    plot(detrend.series(y = rwl[,x], method = "ModNegExp", verbose=TRUE))
+    dev.off()
+  })
+  
+
+
+  write_csv(rwi, paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/', plotname, '-Detrended-ModNegExp.csv'))
+  
+  if(F){
+  # Spline
+  rwi <- detrend(rwl, method = "Spline")
+  
+  p.rwi <- rwi %>% 
+    mutate(year=as.numeric(rownames(rwi))) %>% 
+    pivot_longer(cols = -c(year), names_to = "plot", values_to = "width") %>% 
+    dplyr::filter(! is.na(width)) %>% 
+    ggplot(aes(x = year, y = width, col = plot)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) + 
+    labs(
+      title = paste(plotname, "- Detrended"),
+      x = "Year",
+      y = "Detrended and standardised Width"
+    ) + 
+    theme_minimal()
+  
+  pdf(paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/Figures/', plotname, '-Detrended-Spline.pdf'))
+  print(p.rwi)
+  dev.off()
+  
+  write_csv(rwi, paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/', plotname, '-Detrended-Spline.csv'))
+  }
+}
+
+## Analysis
+library(dplR)
+test <- read.rwl(files[1], format="tucson")
+
+files <- Sys.glob("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/CDendro-output/Corrected/*.rwl")
+
+lapply(files, write.detrend)
+
+files.csv <- Sys.glob("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/*-ModNegExp.csv")
+
+ring_detrended <- setNames(lapply(files.csv, FUN = basic_ring_analysis),
+                           substring(basename(files.csv), 1, 6))
+
+
+# Combine all and write out 
+age_combined <- bind_rows(lapply(ring_detrended, FUN = function(x) {
+  ages <- x[["age"]]
+  colnames(ages) <- c("adult1", "adult2", "adult3", "adult4", "adult5")
+  return(ages)
+} ) )
+colnames(age_combined) <- c(colnames(age_combined)[1:5], "extra")
+
+age_comb_long <- age_combined %>% 
+  pivot_longer(cols = everything(), names_to = "Plot", values_to = "age") %>% 
+  mutate(Plot = paste(rep(plot.info$Plot, each=6), rep(c(as.character(1:5), "e"), 15), sep = "-")) %>% 
+  filter(! is.na(age))
+
+
+# Combine the second elements of each list
+detrended_combined <- bind_rows(lapply(ring_detrended, `[[`,"dec_averages"))
+
+
+# Combine the second elements of each list
+tails_combined <- bind_rows(lapply(ring_detrended, `[[`,"growth_indices"))
+
+
+write_csv(age_comb_long, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/ages.csv")
+write_csv(detrended_combined, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Decadal-indices.csv")
+write_csv(tails_combined, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Growth-indices-last-years.csv")
+
+#### Combine into one file:
+
+ages <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/ages.csv")
+growth_ind <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Growth-indices-last-years.csv")
+
+ring.an.comb <- left_join(ages, growth_ind, by = "Plot") %>% 
+  rename(tree=Plot)
+  
+write_csv(ring.an.comb, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/tree.ring.analysis.csv")
+
+if(F){
+## OLD
+
 ring_basics <- setNames(lapply(files, FUN = basic_ring_analysis),
                         substring(files, nchar(files[1]) - 10, nchar(files[1]) - 5))
+
+t <- ring_basics$P460_1$averages
 
 # Combine all and write out 
 age_combined <- bind_rows(lapply(ring_basics, FUN = function(x) {
@@ -407,11 +580,54 @@ ggplot(data=averages_binned, aes(x=Decade, y=m, colour = bin)) +
 
 class(averages)
 
+### Is there a way to choose which detrending method?
+# The book recommends plotting the mean trends over 20y periods, overlapping by 10:
+
+x <- ring_basics[[1]]
+rd <- x$averages
+names(ring_basics) <- gsub("_", ".", names(ring_basics))
+
+all.20yrav <- lapply(1:15, FUN = function(x){
+  rd <- ring_basics[[x]]$averages
+  plot <- names(ring_basics)[x]
+  
+  dec2av.list <- lapply(1:5, FUN=function(y){
+    rd1 <- filter(rd, Plot == paste0(plot,"-", y))
+    print(rd1)
+    tree <- rep(paste0(plot, "-",  y), nrow(rd1) - 1)
+    central.year <- rd1$Decade[2:nrow(rd1)]
+    y20av <- vector("numeric", length = nrow(rd1)-1)
+    
+    for(d in 2:nrow(rd1)) {
+      y20av[d-1] <- (rd1$Decade_Avg[d-1] * rd1$Valid_Years[d-1] + rd1$Decade_Avg[d] * rd1$Valid_Years[d]) / 
+        (rd1$Valid_Years[d-1] + rd1$Valid_Years[d])
+    }
+    
+    rd20y <- data.frame(tree = tree, centr.year = central.year, rw.av = y20av)
+  })
+  dec2av <- bind_rows(dec2av.list)
+  
+  fig <- ggplot(dec2av, aes(x = centr.year, y = rw.av, col=tree)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = F) + 
+    labs(
+      title = paste(plot, "- 20year ring width averages"),
+      x = "Central Year",
+      y = "Average ring width"
+    ) + 
+    theme_minimal()
+    
+  print(fig)
+  
+  dec2av
+})
 
 
-### Let's go trhough the dplr package documentation----
+
+###
+### Let's go trhough the dplr package documentation--f
 ## Try for 1 plot:
-rwl <- read.rwl(files[1], format="tucson")
+rwl <- read.rwl(files[15], format="tucson")
 
 #corr.rwl.seg(rwl, seg.length = 50, bin.floor = 20)
 
@@ -424,7 +640,7 @@ rwl.stats(rwl)
 # At best it is as good as the stdev of time series in cases of high autocorrelation
 
 #Can also plot some stuff if would be interesting, eg for autocorrelation:
-ar1 <- data.frame(x="P460.1",y=rwl.stats(rwl)$ar1)
+ar1 <- data.frame(x="P480.3",y=rwl.stats(rwl)$ar1)
 ggplot(ar1,aes(x,y)) + geom_boxplot(width=.2) +
   geom_jitter(width=0.1) + 
   labs(y=expression(phi[1]),x=element_blank()) +
@@ -459,7 +675,7 @@ rwi %>%
 !is.na(t$width)
 
 # See what the options are
-detrend.series(y = rwl[, "P460.1-1"], verbose=TRUE)
+detrend.series(y = rwl[, "P480.3-2"], method = "ModNegExp", verbose=TRUE)
 
 # There are other detrend methods, such as converting to basal area increases:
 bai <- bai.out(rwl, diam = NULL)
@@ -510,87 +726,11 @@ plot(rwchron, add.spline=TRUE, nyrs=20)
 
 ## Ok let's detrend them all, using the ModNegExp, Spline: 
 
-write.detrend <- function(file) {
-  plotname <- substring(file, nchar(file)-10, nchar(file)-5)
- 
-  #
-  rwl <- read.rwl(file, format="tucson")
-  
-  p.rwl <- rwl %>% 
-    mutate(year=as.numeric(rownames(rwl))) %>% 
-    pivot_longer(cols = -c(year), names_to = "plot", values_to = "width") %>% 
-    dplyr::filter(! is.na(width)) %>% 
-    ggplot(aes(x = year, y = width, col = plot)) +
-    geom_point() +
-    geom_smooth(method = "lm", se = FALSE) + 
-    labs(
-      title = paste(plotname, "- Original"),
-      x = "Year",
-      y = "Width"
-    ) + 
-    theme_minimal() 
-  
-  pdf(paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/Figures/', plotname, '-Original.pdf'))
-  print(p.rwl)
-  dev.off()
-  
-  # ModNegExp
-  rwi <- detrend(rwl, method = "ModNegExp")
-  
-  p.rwi <- rwi %>% 
-    mutate(year=as.numeric(rownames(rwi))) %>% 
-    pivot_longer(cols = -c(year), names_to = "plot", values_to = "width") %>% 
-    dplyr::filter(! is.na(width)) %>% 
-    ggplot(aes(x = year, y = width, col = plot)) +
-    geom_point() +
-    geom_smooth(method = "lm", se = FALSE) + 
-    labs(
-      title = paste(plotname, "- Detrended"),
-      x = "Year",
-      y = "Detrended and standardised Width"
-    ) + 
-    theme_minimal()
-  
-  pdf(paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/Figures/', plotname, '-Detrended-ModNegExp.pdf'))
-  print(p.rwi)
-  dev.off()
-  
-  write_csv(rwi, paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/', plotname, '-Detrended-ModNegExp.csv'))
-  
-  # Spline
-  rwi <- detrend(rwl, method = "Spline")
-  
-  p.rwi <- rwi %>% 
-    mutate(year=as.numeric(rownames(rwi))) %>% 
-    pivot_longer(cols = -c(year), names_to = "plot", values_to = "width") %>% 
-    dplyr::filter(! is.na(width)) %>% 
-    ggplot(aes(x = year, y = width, col = plot)) +
-    geom_point() +
-    geom_smooth(method = "lm", se = FALSE) + 
-    labs(
-      title = paste(plotname, "- Detrended"),
-      x = "Year",
-      y = "Detrended and standardised Width"
-    ) + 
-    theme_minimal()
-  
-  pdf(paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/Figures/', plotname, '-Detrended-Spline.pdf'))
-  print(p.rwi)
-  dev.off()
-  
-  write_csv(rwi, paste0('/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/', plotname, '-Detrended-Spline.csv'))
-  
-}
-
-lapply(files, write.detrend)
-
-
-
-## Let's see now how some of the trends are now:
-files.csv <- Sys.glob("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/*.csv")
+### Let's see how some of the trends are now, only looking at :
+files.csv <- Sys.glob("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/*-ModNegExp.csv")
 
 ring_detrended <- setNames(lapply(files.csv, FUN = basic_ring_analysis),
-                        substring(files.csv, nchar(files[1]) - 9, nchar(files[1]) - 4))
+                        substring(files.csv, nchar(files.csv[1]) - 9, nchar(files.csv[1]) - 4))
 
 # Combine all and write out 
 age_combined <- bind_rows(lapply(ring_detrended, FUN = function(x) {
@@ -913,7 +1053,10 @@ axis(3, at = freqs, labels = pers)
 mtext(text = "Period (year)", side = 3, line = 1.1)
 axis(2); axis(4)
 box()
-
+}
+# So corrected file are the ones where the dpi was corrected, use this!
+test1 <- read.rwl("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/CDendro-output/P460_1.rwl")
+test1c <- read.rwl("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Raw/CDendro-output/Corrected/P460_1c.rwl")
 
 #### 8 - Climatic data -----
 library(sf)
@@ -969,3 +1112,291 @@ extract_all_climatic_variables <- function(directory, coordinates) {
 }
 
 lapply(directories, extract_all_climatic_variables, coords)
+
+#### 9 - Create csv of fitted parameters -----
+ 
+extract.RDS.params <- function(tree, directory){
+  # Check if -cc exists since this is the updated version
+  if(file.exists(paste0(directory, tree, "-cc.RDS"))){
+    readRDS(paste0(directory, tree, "-cc.RDS"))$`Fitted Parameters`
+  } else { readRDS(paste0(directory, tree, ".RDS"))$`Fitted Parameters`}
+}
+
+param.list <- lapply(info$Plot, FUN = function(x){
+  df <- extract.RDS.params(paste0(x, "-1"), "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/")
+  for(i in 2:10){
+    df <- rbind(df, extract.RDS.params(paste0(x, "-", as.character(i)), "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/"))
+  }
+  rownames(df) <- paste0(x, "-", 1:10)
+  df
+  }
+)
+
+params_all <- bind_rows(param.list, .id = "column_label") %>% 
+  rownames_to_column(var = "tree") %>% 
+  select(-column_label)
+
+# Add extra tree: 
+param_extra <- as.data.frame(c("P475.1-e", readRDS("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/P475.1-e.RDS")$`Fitted Parameters`))
+colnames(param_extra) <- colnames(params_all)
+
+params_all <- rbind(params_all, param_extra)
+
+write_csv(params_all, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Parameters_fitted.csv")
+
+#### 10: Simulate A values for other T and atmospheric Ci ----
+library(dplyr)
+library(magrittr)
+library(photosynthesis)
+library(future)
+plan("multisession")
+
+## Check out some of the function:
+a <- readRDS(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/", "P460.2-2", ".RDS"))
+a$Plot +
+  geom_point(data=a$Data, aes(x=Ci, y=A_carbox), color="red") +
+  geom_point(data=a$Data, aes(x=Ci, y=A_regen), color="blue") +
+  geom_point(data=a$Data, aes(x=Ci, y=A_model), color="darkgreen")
+
+plot(a$Data$Ci, a$Data$A_model)
+aD <- a$Data
+
+### Compare the data/fit with the projected values by plantecophys and photosynthesis packages
+# photosynthesis:
+#-#
+
+bake_par   = make_bakepar(
+  replace = list(
+    # Ea_gammastar = set_units(a$`Fitted Parameters`$Ea_gamma_star, "J / mol") # no effect
+  ))                      # temperature response parameters
+constants  = make_constants(use_tealeaves = F) # physical constants
+leaf_par   = make_leafpar(
+  replace = list(
+    # g_uc = set_units(0.1, "mol / m^2 / s"), # Seems to shift it in the right way?
+    #g_sc = set_units(0.2, "mol / m^2 / s"), # Seems ok
+    T_leaf = set_units(mean(a$Data$Tleaf) + 273.15, "K"),
+    V_cmax25 = set_units(a$`Fitted Parameters`$V_cmax, "umol / m^2 / s"),
+    J_max25 = set_units(a$`Fitted Parameters`$J_max, "umol / m^2 / s"),
+    R_d25 = set_units(abs(a$`Fitted Parameters`$R_d), "umol / m^2 / s"),
+    gamma_star25 = set_units(a$`Fitted Parameters`$gamma_star25, "umol / mol"),
+    g_mc25 = set_units(a$`Fitted Parameters`$g_mc25 + 0.1, "mol / m^2 / s"),
+    theta_J = set_units(a$`Fitted Parameters`$theta_J, "")
+    ), use_tealeaves = F)   # leaf parameters
+enviro_par = make_enviropar(
+  replace = list(
+    C_air = set_units(seq(90, 900, by=90), "umol/mol"),
+    PPFD = set_units(a$Data$Qabs[1], "umol/m^2/s")
+  ), use_tealeaves = F) # environmental parameters
+#-#
+sim.photos18 <- photosynthesis(leaf_par, enviro_par, bake_par, constants, quiet = TRUE,
+                    use_tealeaves = FALSE)
+#plot to compare
+plot(a$Data$Cicor, a$Data$Acor, pch=20)
+points(a$Data$Cicor, a$Data$A_model, col="blue", pch=20)
+points(sim.photos$C_i, sim.photos$A, col="red", pch=19) #photosynthesis
+
+points(sim.plante$Ci, sim.plante$ALEAF, col="orange", pch=19) #planteco
+
+#to compare mesophyl conductance
+plot(a$Data$Cicor, a$Data$Acor, pch=20)
+points(a$Data$Cicor, a$Data$A_model, col="blue", pch=20)
+points(sim.photos$C_i, sim.photos$A, col="red", pch=19) # fitting default
+points(sim.photos18$C_i, sim.photos18$A, col="orange", pch=19) # mesophyl at 0.18
+points(sim.photos38$C_i, sim.photos38$A, col="cyan", pch=19) # mesophyl at 0.38
+
+# plantecophys
+library(plantecophys)
+sim.plante <- Photosyn(VPD = 1.5, 
+                       Ca = seq(90,900, by=90),
+                       PPFD = a$Data$Qabs[1],
+                       Tleaf = 25,
+                       Patm = 101,325,
+                       Jmax = a$`Fitted Parameters`$J_max,
+                       Vcmax = a$`Fitted Parameters`$V_cmax)
+
+points(sim.plante$Ci, sim.plante$ALEAF, col="orange", pch=19)
+
+######## OLD ##
+#-#
+bake_par   = make_bakepar(replace = list())                      # temperature response parameters
+constants  = make_constants(replace = list(
+), use_tealeaves = FALSE) # physical constants
+leaf_par   = make_leafpar(
+  replace = list(
+  T_leaf = set_units(c(288.15, 293.15, 298.15, 303.15), "K"),
+  V_cmax25 = set_units(43.8, "umol / m^2 / s"),
+  J_max25 = set_units(81.7, "umol / m^2 / s")
+), use_tealeaves = FALSE)   # leaf parameters
+enviro_par = make_enviropar(
+  replace = list(
+    C_air = set_units(c(300, 420, 450, 500, 600, 700, 800), "umol/mol"),
+    PPFD = set_units(1681, "umol/m^2/s")
+), use_tealeaves = FALSE) # environmental parameters
+#-#
+
+b <- photosynthesis(leaf_par, enviro_par, bake_par, constants, quiet = TRUE,
+      use_tealeaves = FALSE)
+
+
+####### Automate: 
+info <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Measurements-information.csv")
+
+extract.RDS <- function(tree, directory){
+  # Check if -cc exists since this is the updated version
+  if(file.exists(paste0(directory, tree, "-cc.RDS"))){
+    readRDS(paste0(directory, tree, "-cc.RDS"))
+  } else { readRDS(paste0(directory, tree, ".RDS"))}
+}
+
+simulate.photo <- function(tree){
+  aci.fit <- extract.RDS(tree, 
+                                "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/")
+  
+  #-#
+  bake_par   = make_bakepar()                      # temperature response parameters
+  constants  = make_constants(use_tealeaves = FALSE) # physical constants
+  leaf_par   = make_leafpar(
+    replace = list(
+      T_leaf = set_units(c(288.15, 293.15, 298.15, 303.15), "K"),
+      V_cmax25 = set_units(aci.fit$`Fitted Parameters`$V_cmax, "umol / m^2 / s"),
+      J_max25 = set_units(aci.fit$`Fitted Parameters`$J_max, "umol / m^2 / s"),
+      R_d25 = set_units(abs(aci.fit$`Fitted Parameters`$R_d), "umol / m^2 / s"),
+      gamma_star25 = set_units(aci.fit$`Fitted Parameters`$gamma_star25, "umol / mol"),
+      #g_mc25 = set_units(aci.fit$`Fitted Parameters`$g_mc25 + 0.1, "mol / m^2 / s"),
+      theta_J = set_units(aci.fit$`Fitted Parameters`$theta_J, "")
+    ), use_tealeaves = FALSE)   # leaf parameters
+  enviro_par = make_enviropar(
+    replace = list(
+      C_air = set_units(c(280, 400, 420, 450, 600, 800, 840, 870, 1140), "umol/mol"),
+      PPFD = set_units(aci.fit$Data$Qabs[1], "umol/m^2/s")
+    ), use_tealeaves = FALSE) # environmental parameters
+  #-#
+  
+  sims <- photosynthesis(leaf_par, enviro_par, bake_par, constants, quiet = TRUE,
+                         use_tealeaves = FALSE, parallel = TRUE)
+  write_csv(sims, paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Simulations/",
+                         tree,
+                         ".csv"))
+}
+
+lapply(info$Plot, FUN = function(p) {
+  lapply(as.character(1:10), FUN = function(q){
+    simulate.photo(paste(p, q, sep = "-"))
+  })
+})
+
+sim.all.list <- lapply(info$Plot, FUN = function(p) {
+  sim.plot.list <- lapply(as.character(1:10), FUN = function(q) {
+    sim <- read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Simulations/", paste(p, q, sep = "-"), ".csv"), show_col_types = F)
+    sim.wide <- sim %>% 
+      mutate(simulation = paste(as.character(C_air), as.character(T_leaf - 273.15), sep = "-")) %>% 
+      select(A, C_i, simulation) %>% 
+      pivot_wider(names_from = simulation, values_from = c(C_i, A), names_prefix = "sim")
+  } )
+  print(sim.plot.list)
+  sim.plot <- bind_rows(sim.plot.list) %>% 
+    mutate(tree = paste(p, as.character(1:10), sep = "-"))
+  print(sim.plot)
+} )
+
+write_csv(bind_rows(sim.all.list), "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Simulations.csv")
+
+
+#TEST:
+
+tr <- "P465.2-5"
+sims <- simulations %>% filter(tree == tr)
+meas <- read.csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected/", tr, ".csv"))
+test.plante <- simulate.plante(tr)
+plot(meas$Cicor, meas$Acor, pch=20)
+points(sims[, 1:28], sims[, 29:56], col = "blue", pch=20)
+points(sims$`C_i_sim420-25`, sims$`A_sim420-25`, col = "red", pch=20)
+points(test.plante$Ci, test.plante$ALEAF, col = "orange", pch=20)
+points(sims$`C_i_sim600-30`, sims$`A_sim600-30`, col = "red", pch=20)
+
+aci.fit$`Fitted Parameters`$V_cmax
+aci.fit$Data$Qabs[1]
+
+test.plante <- simulate.plante(tr)
+
+
+simulate.plante <- function(tree){
+  aci.fit <- extract.RDS(tree, 
+                         "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/")
+  
+  fitaci1 <- Photosyn(
+    VPD = 1.5,
+    Ca = 420,
+    PPFD = aci.fit$Data$Qabs[1],
+    Tleaf = 25,
+    Patm = 101,
+    RH = NULL,
+    gsmodel = c("BBOpti", "BBLeuning", "BallBerry", "BBdefine"), #####
+    g1 = 4,
+    g0 = 0,
+    gk = 0.5,
+    vpdmin = 0.5,
+    D0 = 5,
+    GS = NULL,
+    BBmult = NULL,
+    alpha = 0.24,
+    theta = 0.85,
+    Jmax = aci.fit$`Fitted Parameters`$J_max,
+    Vcmax = aci.fit$`Fitted Parameters`$V_cmax,
+    gmeso = NULL,
+    TPU = 1000,
+    alphag = 0,
+    Rd0 = 2,
+    Q10 = 1.92,
+    Rd = NULL,
+    TrefR = 25,
+    Rdayfrac = 1,
+    EaV = 58550,
+    EdVC = 2e+05,
+    delsC = 629.26,
+    EaJ = 29680,
+    EdVJ = 2e+05,
+    delsJ = 631.88,
+    GammaStar = NULL,
+    Km = NULL,
+    Ci = NULL,
+    Tcorrect = TRUE,
+    returnParsOnly = FALSE,
+    whichA = c("Ah", "Amin", "Ac", "Aj") )
+}
+
+#### 11 Create one master file ----
+## Load in data
+gasex.param <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP_GasExchangeParameters.csv")
+leaf.dim <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP_LeafDimensions.csv")
+tree.diam <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP_TreeDbh.csv")
+plot.info <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-PlotInfo.csv") 
+ring.analysis <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP_RingAnalysis.csv") 
+
+#To finalise:
+simulations <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Simulations.csv") 
+
+## (For now?) these do not need recombinations:
+tree.community <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP_TreeCommunity.csv") 
+understory.community <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-UnderstoryCommunity.csv") 
+soil <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-SoilLayers.csv") 
+
+# Rework slightly to be able to join later
+leaf.dim <- rename(leaf.dim, tree = LeafName)
+
+data.master <- gasex.param  %>% 
+  select(tree, V_cmax, V_cmax_se, J_max, J, J_se, R_d, R_d_se) %>% 
+  mutate(Plot = substring(tree, 1, 6),
+         Bin = substring(tree, 1, 4), 
+         Stage = ifelse((as.numeric(substring(tree, nchar(tree), nchar(tree))) %in% 1:5) | (substring(tree, nchar(tree), nchar(tree)) == "e"),
+                        "adult", 
+                        "sapling")) %>% 
+  relocate(c(Plot, Bin, Stage), .after = tree) %>% 
+  left_join(select(tree.diam, tree, diameter), by = "tree") %>% 
+  left_join(leaf.dim, by = "tree") %>% 
+  left_join(select(plot.info, Plot, Longitude, Latitude), by = "Plot") %>% 
+  left_join(simulations %>% relocate(tree, .before = everything()), by = "tree") %>% 
+  left_join(ring.analysis, by = "tree")
+
+write_csv(data.master, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/Combined.csv")
+

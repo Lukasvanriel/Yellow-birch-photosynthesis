@@ -237,11 +237,16 @@ points(m1$Ci, m1$A, pch=20, col="red")
 points(e1$Ci, e1$A, pch=20, col="blue")
 
 fit1 <- fitaci(m1_cor, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
-                                         PPFD = "PARi", Rd ="Rd"), Tcorrect=T, fitmethod='bilinear')
+                                         PPFD = "Qabs", Rd ="Rd"), Tcorrect=T, fitmethod='bilinear')
 
 fit1$pars
 plot(fit1, ylim=c(0,22))
 
+# Test effect of mesophyll conductance: 
+
+fit1 <- fitaci(m1_cor, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                       PPFD = "Qabs", Rd ="Rd"), Tcorrect=T)
+plot(fit1, ylim=c(0,22))
 
 
 # M2: P465.1-2
@@ -597,7 +602,7 @@ m1_cor$g_mc4 <- rep(0.001, nrow(m1_cor))
 
 m1_cor$T_leaf <- m1_cor$Tleaf+273.15
 
-a1 <- fit_aci_response(data = m1_cor, varnames = list(A_net = "Acor", T_leaf = "T_leaf", C_i = "Cicor", 
+a1 <- fit_acianova_V_ad_response(data = m1_cor, varnames = list(A_net = "Acor", T_leaf = "T_leaf", C_i = "Cicor", 
                                             PPFD = "PARi1", g_mc = "g_mc1"))
 a2 <- fit_aci_response(data = m1_cor, varnames = list(A_net = "Acor", T_leaf = "T_leaf", C_i = "Cicor", 
                                                      PPFD = "PARi", g_mc = "g_mc2"))
@@ -891,6 +896,7 @@ correct_aci <- function(plot, tree) {
 
   Cmax <- as.numeric(readline("What is the final upper limit to consider? "))
   
+  #TODO add a title (=argument) to racircal to get nice titles in the figures
   ## Correct the measurements using the empty measurement on the correct range: 
   final.corrected <- racircal(data = as.data.frame(data.split), caldata = as.data.frame(data.empty), 
            mincut = Cmin, maxcut = Cmax)
@@ -975,7 +981,7 @@ clean_aci <- function(tree, cleaned.before=F) {
     }
 }
 
-clean_aci("P460.2-10", cleaned.before = T)
+clean_aci("P475.3-10", cleaned.before = T)
 
 
 
@@ -984,7 +990,7 @@ clean_aci("P460.2-10", cleaned.before = T)
 
 #curves <- Sys.glob("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected-cleaned/*.csv")
 
-curves <- "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected-cleaned/P460.1-7-cc.csv"
+curves <- "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected-cleaned/P475.3-10-cc.csv"
 
 for (curve in curves) {
   data <- read_csv(curve) %>% 
@@ -992,7 +998,7 @@ for (curve in curves) {
   tree <- substring(basename(curve), 1, nchar(basename(curve)) - 7)
   
   aci.fit <- fit_aci_response(data = as.data.frame(data), varnames = list(A_net = "Acor", T_leaf = "Tleaf_K", C_i = "Cicor",
-                                                                          PPFD = "Qabs"))
+                                                                          PPFD = "Qabs")) #This should be absorbed irradiance
   
   pdf(file=paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/Figures/",
                   tree, "-cc.pdf"))
@@ -1007,13 +1013,13 @@ for (curve in curves) {
   
 
 #### Try to fix the really bad ones: 
-tree <- "P460.1-7"
-clean_aci("P460.1-7", cleaned.before = F)
-data.tocut <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected-cleaned/P460.1-7-cc.csv")
+tree <- "P475.3-10"
+clean_aci("P475.3-10", cleaned.before = T)
+data.tocut <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected-cleaned/P475.3-10-cc.csv")
 plot(data.tocut$Cicor, data.tocut$Acor, pch=20)
 
-data.cut <- data.tocut %>% 
-  filter(Cicor < 150 | Cicor > 550)
+data.cut <- data.t0cut %>% 
+  filter(Cicor < 300 | Cicor > 600)
 
 plot(data.cut$Cicor, data.cut$Acor, pch=20)
 plot(fitaci(data.cut, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
@@ -1022,3 +1028,198 @@ write_csv(data.cut, paste0("/Users/lukas/Library/CloudStorage/OneDrive-Universit
                              tree, "-cc.csv"))
 
 
+#### Now let's look at the empty measurements:
+
+info$Plot
+
+e <- lapply(info$Plot, function(x) read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split/",
+                                                   x, "-", as.character(info[info$Plot==x,"empty"]), ".csv")))
+
+# All seem relatively good! P460-1 deviates most from other measurements and P480-1 seem a bit off. 
+# There is a second empty measurement of P480.1, let's see if that helps
+e10 <- read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split/",
+                       "P480.1-12", ".csv"))
+
+plot(e[[13]]$Ci, e[[13]]$A, ylim=c(-4, 4), xlim=c(-10, 1400), pch=20)
+points(e10$Ci, e10$A, ylim=c(-4, 4), pch=20, col="orange")
+
+
+t <- racircal(data = as.data.frame(read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split/",
+                                              "P480.1", "-", as.character(info[info$Plot=="P480.1","sapling 3"]), ".csv"))),
+         caldata = as.data.frame(e[[13]]), mincut = 10, maxcut = 1000)
+
+t2 <- racircal(data = as.data.frame(read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split/",
+                                                   "P480.1", "-", as.character(info[info$Plot=="P480.1","sapling 3"]), ".csv"))),
+              caldata = as.data.frame(e10), mincut = 10, maxcut = 1000)
+
+plot(t$Cicor, t$Acor, pch=20, xlim=c(0, 1100), ylim=c(-2, 15))
+points(t2$Cicor, t2$Acor, pch=20, col="red")
+
+fitaci(t2, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                            PPFD = "PARi", Rd ="Rd"), Tcorrect=T, fitmethod='bilinear')
+
+# Does not seem to change much to the corrected curves. 
+
+#### The extra measurement: -----
+
+correct_aci_extra <- function(data.split, data.empty) {
+  
+  # Get rid of some extreme outliers (Q1/Q3 +- 1.5 x IQR)
+  A_range <- c(quantile(data.split$A)[[2]] - IQR(data.split$A) *1.5, quantile(data.split$A)[[4]] + IQR(data.split$A) *1.5)
+  data.split <- data.split[data.split$A >= A_range[1] & data.split$A <= A_range[2],]
+  
+  data.split <- filter(data.split, Ci < 2000, Ci > -100)
+  ## Iterate until correct range of Ci is used:
+  Cmin <- 10
+  
+  # Iterate at low resolution
+  data.corrected <- lapply(c(800, 900, 1000, 1100, 1200), FUN=function(x){
+    racircal(data = as.data.frame(data.split), caldata = as.data.frame(data.empty), 
+             mincut = Cmin, maxcut = x)
+  })
+  sapply(length(data.corrected):1, FUN=function(x, colors=c("orange", "darkblue", "green", "red", "black")){
+    if(x == length(data.corrected)){plot(data.corrected[[x]]$Cicor, data.corrected[[x]]$Acor, pch=20)
+    } else{points(data.corrected[[x]]$Cicor, data.corrected[[x]]$Acor, col=colors[x], pch=20)}
+  })
+  legend("topleft", legend = as.character(c(1200, 1100, 1000, 900, 800)), 
+         col = c("black", "red", "green", "darkblue", "orange"), pch=20)
+  
+  c.high <- as.numeric(readline("What is the higher colour to explore? "))
+  c.low <- as.numeric(readline("What is the lower colour to explore? "))
+  
+  # Iterate at higher resolution
+  data.corrected2 <- lapply(seq(c.high, c.low, by=-25), FUN=function(x){
+    racircal(data = as.data.frame(data.split), caldata = as.data.frame(data.empty), 
+             mincut = Cmin, maxcut = x)
+  })
+  print(length(data.corrected2))
+  sapply(1:length(data.corrected2), FUN=function(x, colors=c("black", "red", "green", "darkblue", "orange")){
+    if(x == 1){plot(data.corrected2[[x]]$Cicor, data.corrected2[[x]]$Acor, pch=20)
+    } else{points(data.corrected2[[x]]$Cicor, data.corrected2[[x]]$Acor, col=colors[x], pch=20)}
+  })
+  legend("topleft", legend = as.character(seq(c.high, c.low, by=-25)), 
+         col = c("black", "red", "green", "darkblue", "orange"), pch=20)
+  
+  Cmax <- as.numeric(readline("What is the final upper limit to consider? "))
+  
+  ## Correct the measurements using the empty measurement on the correct range: 
+  final.corrected <- racircal(data = as.data.frame(data.split), caldata = as.data.frame(data.empty), 
+                              mincut = Cmin, maxcut = Cmax)
+  
+  treenumber <- as.numeric(substring(tree, nchar(tree), nchar(tree))) + 
+    ifelse(substring(tree, 1, 1) == "a", 0, 5)
+  
+  ## Write out the corrected measurement: 
+  write_csv(final.corrected, paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected/",
+                                    "P475.1", "-", "e", ".csv"))
+}
+
+extra <- read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split/",
+                         "P475.1", "-", as.character(5), ".csv"))
+extra.empty <- read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split/",
+                               "P475.1", "-", as.character(info[info$Plot=="P475.1","empty"]), ".csv"))
+
+correct_aci_extra(extra, extra.empty)
+
+curve <- "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected/P475.1-e.csv"
+
+data <- read_csv(curve) %>% 
+  mutate(Tleaf_K = Tleaf+273.15)
+
+aci.fit <- fit_aci_response(data = as.data.frame(data), varnames = list(A_net = "Acor", T_leaf = "Tleaf_K", C_i = "Cicor",
+                                                                        PPFD = "Qabs"))
+result <- saveRDS(aci.fit,
+        paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/",
+               "P475.1-e",
+               ".RDS"))
+
+pdf(file=paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Fits/Figures/",
+                "P475.1-e", ".pdf"))
+print(result$Plot)
+dev.off()
+
+
+clean_aci("P475.1-e", cleaned.before = F)
+
+
+### Test the effect of mesophyll conductance: ----
+library(tidyverse)
+library(plantecophys)
+library(racir)
+library(photosynthesis)
+# read in curve  P460.2-2
+curve <- read.csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected/P460.2-2.csv")
+#curve <- read.csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/Gas-Measurements/Split-corrected-cleaned/P460.2-2-cc.csv")
+
+plot(curve$Cicor, curve$Acor, pch = 20)
+
+curve <- curve %>% 
+  mutate(
+    Tleaf_K = Tleaf + 273.15,
+    g_mc1 = 0.4,
+    g_mc3 = 1000000)
+
+
+## fits
+fita.d0 <- fitaci(curve, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                        PPFD = "Qabs", Rd ="Rd"), Tcorrect=T, fitmethod='default')
+fita.b0 <- fitaci(curve, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                       PPFD = "Qabs", Rd ="Rd"), Tcorrect=T, fitmethod='bilinear')
+
+fita.d1 <- fitaci(curve, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                        PPFD = "Qabs", Rd ="Rd"), gmeso = 0.4, Tcorrect=T, fitmethod='default')
+fita.b1 <- fitaci(curve, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                        PPFD = "Qabs", Rd ="Rd"), gmeso = 0.4, Tcorrect=T, fitmethod='bilinear')
+
+fita.d2 <- fitaci(curve, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                        PPFD = "Qabs", Rd ="Rd"), gmeso = 0.087, Tcorrect=T, fitmethod='default')
+fita.b2 <- fitaci(curve, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                        PPFD = "Qabs", Rd ="Rd"), gmeso = 0.087, Tcorrect=T, fitmethod='bilinear')
+
+fita.d3 <- fitaci(curve, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                        PPFD = "Qabs", Rd ="Rd"), gmeso = 1000000, Tcorrect=T, fitmethod='default')
+fita.b3 <- fitaci(curve, varnames = list(ALEAF = "Acor", Tleaf = "Tleaf", Ci = "Cicor", 
+                                        PPFD = "Qabs", Rd ="Rd"), gmeso = 1000000, Tcorrect=T, fitmethod='bilinear')
+
+plot(fita.d0)
+plot(fita.b0)
+plot(fita.d1)
+plot(fita.b1)
+plot(fita.d2)
+plot(fita.b2)
+plot(fita.d3)
+plot(fita.b3)
+
+fita.d0$pars
+fita.b0$pars
+fita.d1$pars
+fita.b1$pars
+fita.b2$pars
+fita.b3$pars
+
+
+
+fitp0 <- fit_aci_response(data = as.data.frame(curve), varnames = list(A_net = "Acor", T_leaf = "Tleaf_K", C_i = "Cicor", 
+                                                 PPFD = "Qabs")) 
+fitp0$`Fitted Parameters`
+
+fitp1t <- fit_aci_response(data = as.data.frame(curve), varnames = list(A_net = "Acor", T_leaf = "Tleaf_K", C_i = "Cicor", 
+                                                                       PPFD = "Qabs", g_mc = "g_mc1"), useg_mct = T) 
+fitp1t$`Fitted Parameters`
+
+fitp2 <- fit_aci_response(data = as.data.frame(curve), varnames = list(A_net = "Acor", T_leaf = "Tleaf_K", C_i = "Cicor", 
+                                                                       PPFD = "Qabs", g_mc = "g_mc2"), useg_mc = T)
+fitp2$`Fitted Parameters`
+
+fitp3 <- fit_aci_response(data = as.data.frame(curve), varnames = list(A_net = "Acor", T_leaf = "Tleaf_K", C_i = "Cicor", 
+                                                                       PPFD = "Qabs", g_mc = "g_mc3"), useg_mc = T)
+fitp3$`Fitted Parameters`
+
+fitp0$Plot
+fitp1$Plot
+fitp1t$Plot
+fitp3$Plot
+
+fitp2$`Fitted Parameters`
+fitp3$`Fitted Parameters`
+fitp1$`Fitted Parameters`
