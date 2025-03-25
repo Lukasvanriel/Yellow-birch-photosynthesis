@@ -117,14 +117,184 @@ summary(indval.under)
 ####  Run the ANOVA's:-----
 
 ## plot: 
+
+#### Trying to make nice figure
 ggplot(data.all) +
-  geom_boxplot(aes(y=V_cmax, x=Bin)) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin)) +
+  scale_fill_manual(values = c("#ffffcc", "#a1dab4", "#41b6c4", "#2c7fb8", "#253494")) +
   labs(
-    title = paste("Boxplot of Vcmax per latitude"),
-    x = "Latitude [°N]",
-    y = "Vc,max [umol / m2 / s]"
+    title = expression(paste("Boxplot of ", V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
   ) + 
-  theme_minimal() 
+  theme_minimal() + guides(fill="none")
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin)) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin)) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        , panel.border = element_rect(colour = "black", fill=NA, linewidth=1)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.line=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin)) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        , panel.border = element_rect(colour = "black", fill=NA, linewidth=1)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.line=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin), outlier.shape = NA) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        , panel.border = element_rect(colour = "black", fill=NA, linewidth=1)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.line=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+letters <- data.frame(x = levels(data.all$Bin),
+                      y = data.all %>% group_by(Bin) %>% summarise(m = max(V_cmax)) %>% pull(m),
+                      sign = rep("a", 5))
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin), outlier.shape = NA) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  geom_text(letters, mapping = aes(x = x, y = y, label = sign)) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        , panel.border = element_rect(colour = "black", fill=NA, linewidth=1)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.line=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin)) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  geom_text(letters, mapping = aes(x = x, y = y, label = sign), vjust = -0.8) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        , panel.border = element_rect(colour = "black", fill=NA, linewidth=1)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.line=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+
+letters <- data.frame(x = levels(data.all$Bin),
+                      y = data.all %>% group_by(Bin) %>% summarise(m = min(V_cmax)) %>% pull(m),
+                      sign = rep("a", 5))
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin)) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  geom_text(letters, mapping = aes(x = x, y = y, label = sign), vjust = 1.3) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        , panel.border = element_rect(colour = "black", fill=NA, linewidth=1)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.line=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+
+letters <- data.frame(x = levels(data.all$Bin),
+                      y = rep(4,5),
+                      sign = rep("a", 5))
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin)) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  geom_text(letters, mapping = aes(x = x, y = y, label = sign), vjust = 1.3) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        , panel.border = element_rect(colour = "black", fill=NA, linewidth=1)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.line=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+letters <- data.frame(x = levels(data.all$Bin),
+                      y = rep(75, 5),
+                      sign = rep("a", 5))
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=V_cmax, fill = Bin)) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  geom_text(letters, mapping = aes(x = x, y = y, label = sign), vjust = 1.3) +
+  labs(
+    title = expression(paste(V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))
+  ) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        , panel.border = element_rect(colour = "black", fill=NA, linewidth=1)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.line=element_blank()) + guides(fill=guide_legend(title="Latitude [°N]"))
+
+#####
 
 ggplot(data.all %>% filter(Stage=="adult")) +
   geom_boxplot(aes(y=V_cmax, x=Bin)) +
@@ -252,16 +422,17 @@ print(permanova)
 
 dist_matrix_adult <- dist(data.all[data.all$Stage == "adult", c("V_cmax", "J_max")])
 dist_matrix_sapling <- dist(data.all[data.all$Stage == "sapling", c("V_cmax", "J_max")])
-
+?dist()
 # Perform PERMANOVA
 permanova_adult <- adonis2(dist_matrix_adult ~ Bin, data = data.all %>% filter(Stage == "adult"))
 permanova_sapling <- adonis2(dist_matrix_sapling ~ Bin, data = data.all %>% filter(Stage == "sapling"))
-
+?adonis2
 # Summary of results
 print(permanova_adult) # Not significant
 print(permanova_sapling) # Not significant
 
-
+dispersion <- betadisper(dist_matrix_adult, data.all %>% filter(Stage == "adult") %>% pull(Bin))
+anova(dispersion)
 
 #### Regression of Vcmax/Jmax by various parameters  ------
 
