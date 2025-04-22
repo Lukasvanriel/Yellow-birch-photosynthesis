@@ -5,6 +5,9 @@ library(tidyverse)
 library(conflicted)
 library(vegan)
 library(car)
+library(MVN)
+
+conflicts_prefer(dplyr::filter)
 
 ##### Load data #####
 data.all <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/Combined.csv")
@@ -17,16 +20,286 @@ data.all <- data.all %>%
     Bin = factor(format(round(as.numeric(substring(data.all$Bin, 2, 4)) / 10, 1), nsmall = 1))
   )
 
+# Remove some extra measuremnets (for now?)
+data.all <- data.all %>% 
+  filter(tree != "P475.1-e") %>%  # The extra measurements
+  filter(LeafArea != 40.5634) # Double measurements for P480.1-9
+
+comm.tree.summ <- comm.tree %>% 
+  select(-Plot) %>% 
+  decostand(method = "hellinger") %>% 
+  bind_cols(select(comm.tree, Plot)) %>% 
+  relocate(Plot, .before = everything()) %>% 
+  mutate(
+    Bin = factor(format(round(as.numeric(substring(comm.tree$Plot, 2, 4)) / 10, 1), nsmall = 1))
+  )
+
+comm.tree.pa <- comm.tree %>% 
+  select(-Plot) %>% 
+  decostand(method = "pa") %>% 
+  bind_cols(select(comm.tree, Plot)) %>% 
+  relocate(Plot, .before = everything()) %>% 
+  mutate(
+    Bin = factor(format(round(as.numeric(substring(comm.tree$Plot, 2, 4)) / 10, 1), nsmall = 1))
+  )
+
+comm.under.summ <- comm.under %>% 
+  select(-Plot) %>% 
+  decostand(method = "hellinger") %>% 
+  bind_cols(select(comm.under, Plot)) %>% 
+  mutate(
+    Bin = factor(format(round(as.numeric(substring(comm.tree$Plot, 2, 4)) / 10, 1), nsmall = 1))
+  )
+
 ##### Functions #####
 
 
 ##### Body #####
+
+### PERMANOVA ####
+## Assumptions:
+#Multivariate normality test
+mvn(data = data.all[, c("J_max", "V_cmax")], mvnTest = "mardia") # signficant
+
+## Adults/Saplings for all bins
+data.adult <- data.all %>% 
+  filter(Stage == "adult")
+data.sapling <- data.all %>% 
+  filter(Stage == "sapling")
+
+dist.matrix.adult <- dist(data.adult[, c("V_cmax", "J_max")], method = "euclidean")
+dist.matrix.sapling <- dist(data.sapling[, c("V_cmax", "J_max")], method = "euclidean")
+
+permanova.adult <- adonis2(dist.matrix.adult ~ Bin, data = data.adult)
+permanova.sapling <- adonis2(dist.matrix.sapling ~ Bin, data = data.sapling)
+
+# Summary
+permanova.adult # Not significant
+permanova.sapling # Not significant
+
+
+dispersion <- betadisper(dist.matrix.adult, data.adult %>% pull(Bin))
+anova(dispersion)
+
+dispersion <- betadisper(dist.matrix.sapling, data.sapling %>% pull(Bin))
+anova(dispersion)
+
+
+## Adults vs Saplings per bin
+permanova.bins <- lapply(levels(data.all$Bin), FUN = function(x){
+  data.bin <- data.all %>% 
+    filter(Bin == x)
+  
+  dist.matrix.bin <- dist(data.bin[, c("V_cmax", "J_max")], method = "euclidean")
+  
+  permanova.bin <- adonis2(dist.matrix.bin ~ Stage, data = data.bin)
+  
+  permanova.bin
+} )
+
+permanova.bins[[5]]
+
+####
+# Convert data to long format for ggplot
+df_long <- data.all %>%
+  pivot_longer(cols = c(V_cmax, J_max), names_to = "Variable", values_to = "Value") %>% 
+  mutate(Stage = ifelse(Stage=="adult", "Adults", "Saplings"),
+         Variable = factor(Variable, levels = c("V_cmax", "J_max"),
+                           labels = c(expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s))),
+                                      expression(paste(J[max], ~(mu*mol / m^2 / s))) ) ))
+
+
+# Create boxplot
+ggplot(df_long, aes(x = Bin, y = Value, fill = Stage)) +
+  geom_boxplot(alpha = 0.9, outlier.shape = NA) +  # Boxplot with transparent fill
+  #geom_jitter(width = 0.2, alpha = 0.2, size = 1.5) +  # Adds jitter for visibility
+  facet_grid(rows = vars(Variable), cols = vars(Stage), scales = "free_y", switch = "y", labeller = label_parsed) +  # Facet by Type (row) and Variable (column)
+  scale_fill_brewer(palette = "Set3") +  # Nice color scheme
+  labs(#title = "Distribution of Vcmax and Jmax by stage and Latitude",
+       x = "Latitudinal bin (°N)", y = NULL) + #expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))) +
+  theme_minimal(base_size = 12) +  # Clean theme +
+  theme(
+    legend.position = "none",  # Hide legend (optional),  # Left-aligned facet labels for "a" and "s"
+    strip.placement = "outside",# Move facet labels outside the plot area
+    strip.background = element_blank(),
+    strip.text.x = element_text(size = 13, angle = 0, hjust = 0.5, face = "bold"),
+    strip.text.y.left = element_text(size = 12, angle = 90, hjust = 0.5, face = "bold")
+  ) # Hide legend (optional)
+
+
+### Model relationships ####
+model <- lm(V_cmax ~ J_max , data=data.all)
+summary(model)
+
+
+ggplot(data.all, aes(x = J_max, y = V_cmax)) +
+  geom_point(alpha = 0.6) +  # Scatterplot points
+  geom_smooth(method = "lm", color = "blue", se = TRUE) +  # Linear fit with confidence interval
+  labs(title = "Relationship between Vcmax and Jmax",
+       x = "Vcmax",
+       y = "Jmax") +
+  theme_minimal()
+
+
+model <- lm(V_cmax ~ diameter + LeafArea + Width + Length + age, data=data.all)
+summary(model)
+
+p1 <- ggplot(data.all, aes(x = diameter, y = V_cmax)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", color = "blue", se = TRUE) +
+  labs(title = "", x = "diameter", y = "V_cmax") +
+  theme_minimal()
+
+p2 <- ggplot(data.all, aes(x = LeafArea, y = V_cmax)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", color = "blue", se = TRUE) +
+  labs(title = "", x = "LeafArea", y = "V_cmax") +
+  theme_minimal()
+
+p3 <- ggplot(data.all, aes(x = Width, y = V_cmax)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", color = "blue", se = TRUE) +
+  labs(title = "", x = "Width", y = "V_cmax") +
+  theme_minimal()
+
+p4 <- ggplot(data.all, aes(x = age, y = V_cmax)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", color = "blue", se = TRUE) +
+  labs(title = "", x = "Minimum age", y = "V_cmax") +
+  theme_minimal()
+
+####
+
+mvn(data = data.all[, c("age")], mvnTest = "mardia") # signficant
+hist(data.all$age)
+
+m1 <- aov(age ~ Bin, data = data.all)
+summary(m1)
+
+ggplot(data.all) +
+  geom_boxplot(aes(x=Bin, y=age, fill = Bin)) +
+  scale_fill_manual(values = c("#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac")) +
+  labs(
+    title = expression(paste("Boxplot of ", V[paste(c, ",", max, sep = "")], " per latitude")),
+    x = "Latitude (°N)",
+    y = "Minimum age (yr)"
+  ) + 
+  theme_minimal()
+
+### community compositions ####
+comm.tree.rel <- comm.tree %>% 
+  select(-Plot) %>% 
+  decostand(method = "total") %>% 
+  bind_cols(select(comm.tree, Plot)) %>% 
+  relocate(Plot, .before = everything())
+
+dissimilarity_matrix <- vegdist(comm.tree.rel %>% select(-Plot), method = "bray")
+dissimilarity_matrix
+adonis2(dissimilarity_matrix ~ Bin, data = data.frame(Bin=rep(seq(46, 48, by=0.5), each=3)), permutations = 999)
+
+
+#### effect of species presence/abundance on vcmax/jmax##
+data.comb <- data.all %>% 
+  left_join(comm.tree.rel, by="Plot")
+data.comb.pa <- data.all %>% 
+  left_join(comm.tree.pa, by="Plot")
+
+cover.V <- lm(V_cmax ~ AS + BA + FG + PG + TA + TC + AB + OV + BP + TO + AR + FN, data = data.comb)
+summary(cover.V)
+
+cover.test <- lm(J_max ~ AB, data = data.comb)
+summary(cover.test)
+
+
+ggplot(data.comb.pa, aes(x = AR, y = J_max)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", color = "blue", se = TRUE) +
+  labs(title = "", x = "Relative cover by Acer Sacch.", y = "V_cmax") +
+  theme_minimal()
+
+
+heatmap(round(cor(data.comb[,96:107]),2))
+
+plot(data.comb$PG, data.comb$TA)
+
+
+#### SOIL
+## pH: Linear mixed model:
+data.soil <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-SoilLayers.csv")
+
+data.soil <- data.soil %>%
+  mutate(
+    Bin = factor(format(round(as.numeric(substring(Plot, 2, 4)) / 10, 1), nsmall = 1))
+  )
+  
+
+lmer_pH <- lmer(pH ~ Bin + (1 | Plot), data = data.soil)
+summary(lmer_pH)
+
+library(lmerTest)
+anova(lmer_pH)
+hist(data.soil$pH)
+
+library(emmeans)
+emm <- emmeans(lmer_pH, pairwise ~ Bin)
+
+plot(emm, comparisons = TRUE)
+
+## Soil texture class:
+# By bin
+chisq.test(table(data.soil$Bin, data.soil$soil_class))
+
+table_soil <- table(data.soil$Bin, data.soil$soil_class)
+prop.table(table_soil, margin = 1)  #
+
+chisq <- chisq.test(table_soil)
+chisq$residuals
+
+library(corrplot)
+corrplot(chisq$residuals, is.cor = FALSE)
+
+# By plot
+chisq.test(table(data.soil$Plot, data.soil$soil_class))
+
+table_soil <- table(data.soil$Plot, data.soil$soil_class)
+prop.table(table_soil, margin = 1)  #
+
+chisq <- chisq.test(table_soil)
+chisq$residuals
+
+corrplot(chisq$residuals, is.cor = FALSE)
+
+## Permanova for community compositions
+
+dist.matrix.tree <- vegdist(comm.tree.summ%>% select(-c(Plot, Bin)), method = "bray")
+
+
+adonis2(dist.matrix.tree ~ Bin, data = comm.tree.summ)
+
+betadisper_result <- betadisper(dist.matrix.tree, comm.tree.summ %>% pull(Bin))
+anova(betadisper_result)
+
+dist.matrix.under <- vegdist(comm.under.summ%>% select(-c(Plot, Bin)), method = "bray")
+
+adonis2(dist.matrix.under ~ Bin, data = comm.under.summ)
+
+betadisper_result <- betadisper(dist.matrix.under, comm.under.summ %>% pull(Bin))
+anova(betadisper_result)
+
+### OLD ####
+plot(data.soil$Bin, data.soil$pH)
 
 #### Community PCA's ------
 # Create tree community composition per plot
 comm.tree.summ <- comm.tree %>% 
   select(-Plot) %>% 
   decostand(method = "hellinger") %>% 
+  bind_cols(select(comm.tree, Plot)) %>% 
+  relocate(Plot, .before = everything())
+
+comm.tree.pa <- comm.tree %>% 
+  select(-Plot) %>% 
+  decostand(method = "pa") %>% 
   bind_cols(select(comm.tree, Plot)) %>% 
   relocate(Plot, .before = everything())
 
@@ -642,4 +915,8 @@ print(permanova_465) # Not significant
 print(permanova_470) # Not significant
 print(permanova_475) # Not significant
 print(permanova_480) # Not significant
+
+
+
+
 
