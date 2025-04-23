@@ -168,6 +168,9 @@ p4 <- ggplot(data.all, aes(x = age, y = V_cmax)) +
   labs(title = "", x = "Minimum age", y = "V_cmax") +
   theme_minimal()
 
+model <- lm(V_cmax ~ age, data=data.all)
+summary(model)
+
 ####
 
 mvn(data = data.all[, c("age")], mvnTest = "mardia") # signficant
@@ -285,6 +288,134 @@ adonis2(dist.matrix.under ~ Bin, data = comm.under.summ)
 
 betadisper_result <- betadisper(dist.matrix.under, comm.under.summ %>% pull(Bin))
 anova(betadisper_result)
+
+
+##### Dendro ####
+library(treeclim)
+
+plot.data <- read.csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-PlotInfo.csv")
+coords <- plot.data %>% 
+  select(Plot, Longitude, Latitude) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
+
+data.rings.480.1 <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/P480_1-Detrended-ModNegExp.csv")
+clim.TN <- read_csv("/Users/lukas/Downloads/meanT/tg_mean.csv")
+clim.PN <- read_csv("/Users/lukas/Downloads/Prectot/prcptot.csv")
+clim.TS <- read_csv("/Users/lukas/Downloads/Tmean/tg_mean.csv")
+clim.PS <- read_csv("/Users/lukas/Downloads/TotalPrec/prcptot.csv")
+
+clim.T <- rbind(clim.TN, clim.TS)
+clim.P <- rbind(clim.PN, clim.PS)
+
+## Extract correct climate data:
+clim.T.sf <- clim.T %>% 
+  mutate(time = substring(time, 1,7)) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+times <- unique(clim.T.sf$time)
+results <- list()
+
+for (t in times) {
+  print(t)
+  # Filter raster data for the current year
+  climate_year <- clim.T.sf %>% dplyr::filter(time == t)
+  
+  # Perform a spatial join for the current year
+  matched <- st_join(coords, climate_year, join = st_nearest_feature)
+  
+  # Add the year column explicitly (it will be consistent)
+  matched <- matched %>%
+    mutate(time = t) %>%
+    select(Plot, time, 
+           paste0("ssp245_", "tg_mean", "_p50"),
+           paste0("ssp126_", "tg_mean", "_p50"),
+           paste0("ssp585_", "tg_mean", "_p50"),
+    ) %>% 
+    separate(time, into = c("year", "month"), sep = "-") %>% 
+    mutate(year = as.numeric(year), month = as.numeric(month)) %>% 
+    st_drop_geometry()# Keep relevant columns
+  
+  # Append the results to the list
+  results[[as.character(t)]] <- matched
+}
+results.comb.T <- bind_rows(results, .id = "column_label")
+temp.sel <- results.comb.T  %>% 
+  rename(temp = ssp245_tg_mean_p50) %>% 
+  select(Plot, year, month, temp)
+  
+## Extract correct climate data:
+clim.P.sf <- clim.P %>% 
+  mutate(time = substring(time, 1,7)) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+times <- unique(clim.P.sf$time)
+results <- list()
+
+for (t in times) {
+  print(t)
+  # Filter raster data for the current year
+  climate_year <- clim.P.sf %>% dplyr::filter(time == t)
+  
+  # Perform a spatial join for the current year
+  matched <- st_join(coords, climate_year, join = st_nearest_feature)
+  
+  # Add the year column explicitly (it will be consistent)
+  matched <- matched %>%
+    mutate(time = t) %>%
+    select(Plot, time, 
+           paste0("ssp245_", "prcptot", "_p50"),
+           paste0("ssp126_", "prcptot", "_p50"),
+           paste0("ssp585_", "prcptot", "_p50"),
+    ) %>% 
+    separate(time, into = c("year", "month"), sep = "-") %>% 
+    mutate(year = as.numeric(year), month = as.numeric(month)) %>% 
+    st_drop_geometry()# Keep relevant columns
+  
+  # Append the results to the list
+  results[[as.character(t)]] <- matched
+}
+results.comb.P <- bind_rows(results, .id = "column_label")
+prec.sel <- results.comb.P %>% 
+  rename(prec = ssp245_prcptot_p50) %>% 
+  select(Plot, year, month, prec)
+
+head(temp.sel)
+head(prec.sel)
+
+
+## Try for one plot
+plot_name <- "P460_1"
+data.rings <- read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/", plot_name, "-Detrended-ModNegExp.csv"))
+
+plot.name <- "P460.1"
+data.climate <- merge(temp.sel %>% filter(Plot == plot.name),
+                   prec.sel %>% filter(Plot == plot.name)) %>% 
+  select(-Plot) %>% 
+  arrange(year, month)
+
+
+
+## Now the treerings
+tr <- data.rings %>% 
+  column_to_rownames("year")
+
+## Try the dcc
+# dc_resp <- dcc(muc_spruce, muc_clim)
+test <- dcc(dplR::chron(tr), data.48.1)
+test <- dcc(tr, data.48.1, dynamic = "moving")
+
+test$coef
+plot(test) + scale_color_manual(values = c("steelblue", "tomato3"))
+
+
+
+
+
+
+
+
+
+
 
 ### OLD ####
 plot(data.soil$Bin, data.soil$pH)
