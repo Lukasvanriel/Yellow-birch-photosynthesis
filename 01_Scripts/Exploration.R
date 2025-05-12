@@ -214,7 +214,7 @@ cover.test <- lm(J_max ~ AB, data = data.comb)
 summary(cover.test)
 
 
-ggplot(data.comb.pa, aes(x = AR, y = J_max)) +
+ggplot(data.comb, aes(x = AB, y = J_max)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "lm", color = "blue", se = TRUE) +
   labs(title = "", x = "Relative cover by Acer Sacch.", y = "V_cmax") +
@@ -307,6 +307,7 @@ clim.PS <- read_csv("/Users/lukas/Downloads/TotalPrec/prcptot.csv")
 clim.T <- rbind(clim.TN, clim.TS)
 clim.P <- rbind(clim.PN, clim.PS)
 
+
 ## Extract correct climate data:
 clim.T.sf <- clim.T %>% 
   mutate(time = substring(time, 1,7)) %>%
@@ -384,10 +385,10 @@ head(prec.sel)
 
 
 ## Try for one plot
-plot_name <- "P460_1"
+plot_name <- "P480_1"
 data.rings <- read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/", plot_name, "-Detrended-ModNegExp.csv"))
 
-plot.name <- "P460.1"
+plot.name <- "P480.1"
 data.climate <- merge(temp.sel %>% filter(Plot == plot.name),
                    prec.sel %>% filter(Plot == plot.name)) %>% 
   select(-Plot) %>% 
@@ -406,6 +407,115 @@ test <- dcc(tr, data.48.1, dynamic = "moving")
 
 test$coef
 plot(test) + scale_color_manual(values = c("steelblue", "tomato3"))
+
+
+
+###### Climate data and response functions:
+extract_monthly_clim <- function(t, climate.layer, coords){
+  print(t)
+  # Filter raster data for the current time
+  clim.t <- climate.layer %>% filter(time == t)
+  # Perform a spatial join for the current time
+  matched <- st_join(coords, clim.t, join = st_nearest_feature) %>% 
+    select(Plot, time, matches("^ssp.*_p50$")) %>% 
+    separate(time, into = c("year", "month"), sep = "-") %>% 
+    mutate(year = as.numeric(year), month = as.numeric(month)) %>% 
+    st_drop_geometry()# Keep relevant columns
+}
+
+lapply(seq_along(monthly.clim), function(i) {
+  print(monthly.clim[[i]])
+  clim.sf <- monthly.clim[[i]] %>% 
+    mutate(time = substring(time, 1,7)) %>%
+    st_as_sf(coords = c("lon", "lat"), crs = 4326)
+  clim.plots <- bind_rows(lapply(unique(clim.sf$time), FUN = extract_monthly_clim, clim.sf, coords), .id = "column_label")
+  
+  write_csv(clim.plots, paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/ClimateData/Monthly/", basename(clim.folders[[i]]), ".csv"))
+})
+
+#### Automate:
+## Data
+clim.files <- list.files("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/ClimateData/Monthly", pattern = "\\.csv", full.names = T)
+
+monthly.clim <- lapply(clim.files, FUN =read_csv)
+names(monthly.clim) <- basename(clim.files)
+
+plot.data <- read.csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-PlotInfo.csv") %>% 
+  mutate(Plot = gsub("\\.", "_", Plot))
+
+coords <- plot.data %>% 
+  select(Plot, Longitude, Latitude) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
+
+tree.rings <- lapply(plot.data$Plot, FUN = function(p) { 
+  read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/", p, "-Detrended-ModNegExp.csv"))
+} )
+names(tree.rings) <- plot.data$Plot
+
+## Functions
+names(monthly.clim)
+response_curve_analysis <- function(plot, vars, clim.data, rings.data) {
+  clim <- clim.data[vars]
+  rings <- rings.data[[plot]] %>% 
+    column_to_rownames("year")
+  ##TODO: Find a way to combine multiple variables in the one dataframe for usage
+  clim.sel <- clim  %>% 
+    rename(clim.var = matches("^ssp245.*_p50$")) %>% 
+    select(Plot, year, month, clim.var) %>% 
+    filter(Plot == plot) %>% 
+    select(-Plot) %>% 
+    arrange(year, month) %>% 
+    as.data.frame()
+  
+  response <- dcc(dplR::chron(rings), clim.sel)
+  
+  plot(response) + scale_color_manual(values = c("steelblue", "tomato3"))
+}
+response_curve_analysis("P480_1", c("ColdestDay.csv"), monthly.clim, tree.rings)
+
+monthly.clim[c("ColdestDay.csv")]
+tree.rings[["P480_1"]]
+
+ ## 
+clim <- monthly.clim[[1]]
+rings <- tree.rings[[1]] %>% 
+  column_to_rownames("year")
+
+## Extract correct climate data:
+p <- "P480_1"
+
+clim.sel <- clim  %>% 
+  rename(clim.var = matches("^ssp245.*_p50$")) %>% 
+  select(Plot, year, month, clim.var) %>% 
+  filter(Plot == p) %>% 
+  select(-Plot) %>% 
+  arrange(year, month) %>% 
+  as.data.frame()
+
+head(clim.sel)
+
+## Try for one plot
+?dcc
+test <- dcc(dplR::chron(rings), clim.sel)
+
+test$coef
+plot(test) + scale_color_manual(values = c("steelblue", "tomato3"))
+
+
+
+
+## Now the treerings
+
+## Try the dcc
+# dc_resp <- dcc(muc_spruce, muc_clim)
+test <- dcc(dplR::chron(tr), data.48.1)
+test <- dcc(tr, data.48.1, dynamic = "moving")
+
+test$coef
+plot(test) + scale_color_manual(values = c("steelblue", "tomato3"))
+
+
+
 
 
 
