@@ -134,7 +134,7 @@ inset_regions <- data.frame(name=c("ONTARIO", "QUEBEC", "USA"), lat=c(49.441, 50
 
 main_map <- ggplot() +
   geom_sf(data = quebec_cropped, fill = "lightgray", color = "black", linewidth=0.3, alpha = 0.5) +
-  geom_sf(data = r3c, fill = "orange", alpha = 0.3, show.legend = T) + 
+  geom_sf(data = r3c, fill = "orange", alpha = 0.3) + 
   geom_sf(data = r4c, fill = "yellow", alpha = 0.3) + 
   geom_sf(data = r5c, fill = "lightgreen", alpha = 0.3) +
   geom_sf(data = roads_cropped, color = "darkgrey", size = 0.5, alpha = 2) +
@@ -153,7 +153,7 @@ inset_map <- ggplot() +
   #geom_sf(data = c_cropped, fill = "white", color = "black") +
   geom_sf(data = states_cropped, fill = "white", color = "black", alpha=0, linewidth = 0.1) +
   geom_sf(data = ba_sf, aes(fill="HR"), color="grey", show.legend = T) +
-  scale_fill_manual(name=" ", values=c("HR" = "grey"), labels = c("HR" = "Historical range")) + #\n
+  scale_fill_manual(name=" ", values=c("HR" = "grey"), labels = c("HR" = "Historical range \n(Little, 1971)")) + #\n
   geom_sf(data = study_bbox, color = "red", alpha = 0.1, linewidth=0.5) +
   geom_sf(data = inset_cities, color = "black", size = 1.2, shape = 15) +
   geom_text(data = inset_regions, aes(x = long, y = lat, label =name), 
@@ -189,6 +189,41 @@ final_plot
 
 
 
+maroon
+
+######
+r3c$Zone <- "Sugar maple - Yellow birch"
+r4c$Zone <- "Balsam fir - Yellow birch"
+r5c$Zone <- "Balsam fir - White birch"
+quebec_cropped$Zone <- "Other"
+rc <- rbind(r3c, r4c, r5c)
+data_cropped$Sites <- rep("Sites", 152)
+
+main_map <- ggplot() +
+  geom_sf(data = quebec_cropped, fill = "lightgray", color = "black", linewidth=0.3, alpha = 0.5) +
+  geom_sf(data = rc, aes(fill = Zone), alpha = 0.3) +
+  geom_sf(data = roads_cropped, color = "darkgrey", size = 0.5, alpha = 2) +
+  geom_sf(data = data_cropped, aes(color=Sites), size = 2.5)  + 
+  geom_sf(data = cities_cropped, shape = 15, color = "black", size = 2) +
+  geom_text(data = cities_cropped, aes(x = LONGITUDE, y = LATITUDE, label = NAME_EN), 
+            size = 3, hjust = c(0.45, 0.3, 0.4), vjust = c(-1.1, -1.4, 2), fontface = "bold") +
+  annotation_scale(location = "bl", pad_x = unit(0.55, "cm"), pad_y = unit(0.8, "cm"), style = "bar", width_hint=0.15) +
+  annotation_north_arrow(location = "bl", style = north_arrow_fancy_orienteering, pad_x = unit(0.75, "cm"), pad_y = unit(1.4, "cm"),
+                         height=unit(1, "cm"), width = unit(1, "cm")) +
+  scale_fill_manual(
+    name = "Bioclimatic zone",  # ← custom title for filled polygons
+    values = c("Sugar maple - Yellow birch" = "orange", "Balsam fir - Yellow birch" = "yellow", "Balsam fir - White birch" = "lightgreen")  
+  )+
+  scale_color_manual(
+    name = "",
+    values = c("Sites" = "maroon")
+  ) +
+  labs(title = "",
+       x = "", y = "") +
+  theme_minimal() 
+legend <- get_legend(main_map)
+######
+
 
 extra_elements <- ggplot() +
   geom_sf(data = r3c, fill = "orange", alpha = 0.3) +
@@ -211,3 +246,30 @@ plot_grid(
 )
 
 ggdraw(main_map, xlim = c(0.5,1), clip = "off")
+
+
+######
+points <- data.frame(x=coords.pep$longitude, y=coords.pep$latitude) %>% 
+  st_as_sf(coords = c("x", "y"), crs = 4326) %>% 
+  mutate("Yb" = rep("Observations du bouleau jaune", nrow(points)))
+st_crs(quebec) == st_crs(points)
+ba_trans <- st_transform(ba_sf, st_crs(quebec))
+  
+ggplot() +
+  geom_sf(data = quebec, fill = "lightgray", color = "black", linewidth=0.3, alpha = 0.8) +
+  geom_sf(data = study_bbox, color = "darkblue", alpha = 0.1, linewidth=0.5) +
+  geom_sf(data=points, aes(color=Yb), size=0.5)+ 
+  geom_sf(data = cities_cropped[c(1,3),], shape = 15, color = "black", size = 2)+
+  geom_sf(data = data_cropped, aes(color=Sites), size = 1.5) +
+  geom_text(data = cities_cropped[c(1,3),], aes(x = LONGITUDE, y = LATITUDE, label = NAME_EN), 
+            size = 3, hjust = c(0.45, 0.4), vjust = c(-1.1, 2), fontface = "bold") +
+  coord_sf(xlim = c(-79, -73), ylim = c(45, 48.8)) + scale_color_manual(
+    name = "",
+    values = c("Observations du bouleau jaune" = "orange", "Sites" = "maroon")
+  )  +
+  guides(color = guide_legend(override.aes = list(size = 1.5))) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(legend.position = c(0.15, 0.97))
+
+

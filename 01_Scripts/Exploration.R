@@ -69,14 +69,16 @@ data.sapling <- data.all %>%
 
 dist.matrix.adult <- dist(data.adult[, c("V_cmax", "J_max")], method = "euclidean")
 dist.matrix.sapling <- dist(data.sapling[, c("V_cmax", "J_max")], method = "euclidean")
+dist.matrix.all <- dist(data.all[, c("V_cmax", "J_max")])
 
 permanova.adult <- adonis2(dist.matrix.adult ~ Bin, data = data.adult)
 permanova.sapling <- adonis2(dist.matrix.sapling ~ Bin, data = data.sapling)
+permanova.all <- adonis2(dist.matrix.all ~ Bin * Stage, data = data.all)
 
 # Summary
 permanova.adult # Not significant
 permanova.sapling # Not significant
-
+permanova.all # Not significant
 
 dispersion <- betadisper(dist.matrix.adult, data.adult %>% pull(Bin))
 anova(dispersion)
@@ -84,6 +86,8 @@ anova(dispersion)
 dispersion <- betadisper(dist.matrix.sapling, data.sapling %>% pull(Bin))
 anova(dispersion)
 
+dispersion <- betadisper(dist.matrix.all, data.all %>% pull(Bin, Stage))
+anova(dispersion)
 
 ## Adults vs Saplings per bin
 permanova.bins <- lapply(levels(data.all$Bin), FUN = function(x){
@@ -105,8 +109,8 @@ df_long <- data.all %>%
   pivot_longer(cols = c(V_cmax, J_max), names_to = "Variable", values_to = "Value") %>% 
   mutate(Stage = ifelse(Stage=="adult", "Adults", "Saplings"),
          Variable = factor(Variable, levels = c("V_cmax", "J_max"),
-                           labels = c(expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s))),
-                                      expression(paste(J[max], ~(mu*mol / m^2 / s))) ) ))
+                           labels = c(expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol *~ m^{-2} *~ s^{-1}))),
+                                      expression(paste(J[max], ~(mu*mol *~ m^{-2} *~ s^{-1}))) ) ))
 
 
 # Create boxplot
@@ -116,7 +120,7 @@ ggplot(df_long, aes(x = Bin, y = Value, fill = Stage)) +
   facet_grid(rows = vars(Variable), cols = vars(Stage), scales = "free_y", switch = "y", labeller = label_parsed) +  # Facet by Type (row) and Variable (column)
   scale_fill_brewer(palette = "Set3") +  # Nice color scheme
   labs(#title = "Distribution of Vcmax and Jmax by stage and Latitude",
-       x = "Latitudinal bin (°N)", y = NULL) + #expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol / m^2 / s)))) +
+       x = "Latitudinal bin (°N)", y = NULL) + #expression(paste(V[paste(c, ",", max, sep = "")], ~(mu*mol m^{-2} s^-1)))) +
   theme_minimal(base_size = 12) +  # Clean theme +
   theme(
     legend.position = "none",  # Hide legend (optional),  # Left-aligned facet labels for "a" and "s"
@@ -125,6 +129,24 @@ ggplot(df_long, aes(x = Bin, y = Value, fill = Stage)) +
     strip.text.x = element_text(size = 13, angle = 0, hjust = 0.5, face = "bold"),
     strip.text.y.left = element_text(size = 12, angle = 90, hjust = 0.5, face = "bold")
   ) # Hide legend (optional)
+
+
+ggplot(df_long %>% mutate(Stage = substring(Stage,1,1)), aes(x = Stage, y = Value, fill = Stage)) +
+  geom_boxplot(alpha = 0.9, outlier.shape = NA) +
+  facet_grid(rows = vars(Variable), cols = vars(Bin), scales = "free_y", switch = "y", labeller = label_parsed) +
+  scale_fill_brewer(palette = "Set3") +
+  scale_x_discrete(labels = function(x) parse(text = x)) +  # Render expressions for subscripts
+  labs(x = NULL, y = NULL, title = "Latitudinal bin (°N)") +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 13, hjust = 0.5, margin = margin(b = 10)),
+    legend.position = "none",
+    strip.text = element_text(size = 13),
+    strip.placement = "outside",
+    axis.text.x = element_text(size = 12),
+    strip.text.y.left = element_text(size = 11, angle = 90, hjust = 0.5, face = "bold"),
+    panel.spacing = unit(0.5, "lines")
+  )
 
 
 ### Model relationships ####
@@ -412,7 +434,92 @@ plot(test) + scale_color_manual(values = c("steelblue", "tomato3"))
 
 
 
+#### Get elevation
+library(terra)
+library(sf)
 
+
+
+
+data.elev <- read_sf("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Elevation/Index_MNT20k.shp")
+#test <- rast("/Users/lukas/Downloads/test/f31j02_101/w001001.adf")
+
+coords <- data.all %>% 
+  select(Plot, Longitude, Latitude) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>% 
+  st_transform(crs = crs(test))
+
+
+st_crs(test) == st_crs(coords)
+
+values <- terra::extract(test, vect(coords))
+
+
+projectRaster(coords, test) 
+
+sp::plot(test)
+plot(data.elev)
+
+
+
+st_crs(coords) == st_crs(data.elev)
+
+##
+
+merge <- st_join(coords, st_astest, join = st_nearest_feature)
+
+merge2 <- terra::extract(data.elev, vect(coords), method = "bilinear")
+
+merge
+
+
+####
+cells <- unique(merge$No_tuile2)
+urls <- paste0("https://diffusion.mern.gouv.qc.ca/diffusion/RGQ/Matriciel/Elevation/Local/MNA_20k/Grid/F", substring(cells, 1,5), "_0", substring(cells, 6,8), ".zip")
+  
+results <- lapply(urls, function(u){
+  temp_file <- tempfile(fileext = ".zip")
+  zipfile <- download.file(u, temp_file)
+  unzip(temp_file, exdir = paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Elevation/", substring(u, 95, 98)))
+  
+  # 3. List folders in the unzipped directory
+  dirs <- list.dirs(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Elevation/", substring(u, 95, 98), "/", substring(u, 88, 98)),  recursive = TRUE)
+  
+  # 4. Look for folders that contain the .adf file (usually 'hdr.adf' or 'w001001.adf')
+  adf_dirs <- dirs[sapply(dirs, function(d) any(grepl("\\.adf$", list.files(d))))]
+  
+  # Check what we found
+  print(adf_dirs)
+  
+  # 5. Read the raster (ArcInfo binary grids must be read from the folder, not the file)
+  r <- rast(adf_dirs[1])  # assuming the first match is the one you want
+  plot(r)
+  
+  terra::extract(r, vect(coords))
+})
+substring(url, 88, 98)
+results[[1]]
+head
+
+first_col <- results[[1]][, 1]
+
+# Step 2: Extract the second column from all data frames into a matrix
+second_cols <- sapply(results, function(df) df[, 2])
+
+# Step 3: Merge second columns by selecting the non-NA value for each row
+merged_values <- apply(second_cols, 1, function(x) x[!is.na(x)][1])
+
+# Step 4: Reconstruct the final data frame
+final_df <- data.frame(ID = first_col, Value = merged_values, row.names = rownames(results[[1]]))
+
+print(final_df)
+
+write_csv(final_df, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Elevation/el.csv")
+
+
+
+
+#### Try out CCA ######
 
 
 
