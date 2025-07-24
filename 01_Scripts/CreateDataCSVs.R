@@ -388,15 +388,26 @@ basic_ring_analysis <- function(file) {
   results$growth_indices <- ring.data.raw %>% 
     pivot_longer(cols = -year, names_to = "Plot", values_to = "Width") %>% 
     group_by(Plot) %>% 
-    summarise(mean10 = mean(tail(Width, 10), na.rm = TRUE),
-              mean20 = mean(tail(Width, 20), na.rm = TRUE),
-              mean30 = mean(tail(Width, 30), na.rm = TRUE),
-              mean40 = mean(tail(Width, 40), na.rm = TRUE),
-              mean50 = mean(tail(Width, 50), na.rm = TRUE))
+    summarise(last10 = mean(tail(Width, 10), na.rm = TRUE),
+              last20 = mean(tail(Width, 20), na.rm = TRUE),
+              last30 = mean(tail(Width, 30), na.rm = TRUE),
+              last40 = mean(tail(Width, 40), na.rm = TRUE),
+              last50 = mean(tail(Width, 50), na.rm = TRUE),
+              first10 = mean(head(na.omit(Width), 10), na.rm = TRUE),
+              first20 = mean(head(na.omit(Width), 20), na.rm = TRUE),
+              first30 = mean(head(na.omit(Width), 30), na.rm = TRUE),
+              first40 = mean(head(na.omit(Width), 40), na.rm = TRUE),
+              first50 = mean(head(na.omit(Width), 50), na.rm = TRUE))
   
   ## Return ages and decadal averages as a list
   results
 }
+
+a <- c(NA, 1,2,3,4, NA, NA, 6,7,NA,9, NA)
+class(na.omit(a))
+
+data.frame(a=na.omit(a))
+
 
 write.detrend <- function(file) {
   plotname <- substring(basename(file), 1, 6)

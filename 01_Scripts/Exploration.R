@@ -6,6 +6,7 @@ library(conflicted)
 library(vegan)
 library(car)
 library(MVN)
+library(sf)
 
 conflicts_prefer(dplyr::filter)
 
@@ -456,11 +457,15 @@ lapply(seq_along(monthly.clim), function(i) {
 })
 
 #### Automate:
+library(purrr)
+library(treeclim)
+library(tidyverse)
+library(sf)
 ## Data
 clim.files <- list.files("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/ClimateData/Monthly", pattern = "\\.csv", full.names = T)
 
 monthly.clim <- lapply(clim.files, FUN =read_csv)
-names(monthly.clim) <- basename(clim.files)
+names(monthly.clim) <- substr(basename(clim.files), 1, nchar(basename(clim.files)) - 4)
 
 plot.data <- read.csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-PlotInfo.csv") %>% 
   mutate(Plot = gsub("\\.", "_", Plot))
@@ -475,28 +480,64 @@ tree.rings <- lapply(plot.data$Plot, FUN = function(p) {
 names(tree.rings) <- plot.data$Plot
 
 ## Functions
-names(monthly.clim)
+
 response_curve_analysis <- function(plot, vars, clim.data, rings.data) {
   clim <- clim.data[vars]
   rings <- rings.data[[plot]] %>% 
     column_to_rownames("year")
-  ##TODO: Find a way to combine multiple variables in the one dataframe for usage
-  clim.sel <- clim  %>% 
-    rename(clim.var = matches("^ssp245.*_p50$")) %>% 
-    select(Plot, year, month, clim.var) %>% 
-    filter(Plot == plot) %>% 
-    select(-Plot) %>% 
-    arrange(year, month) %>% 
-    as.data.frame()
   
-  response <- dcc(dplR::chron(rings), clim.sel)
+  clim.sel <- lapply(clim, FUN = function(c) {
+    c  %>% 
+      rename(clim.var = matches("^ssp245.*_p50$")) %>% 
+      select(Plot, year, month, clim.var) %>% 
+      filter(Plot == plot) %>% 
+      select(-Plot) %>% 
+      arrange(year, month) %>% 
+      as.data.frame()
+  })
   
-  plot(response) + scale_color_manual(values = c("steelblue", "tomato3"))
-}
-response_curve_analysis("P480_1", c("ColdestDay.csv"), monthly.clim, tree.rings)
+  clim.sel <- map2(clim.sel, vars, ~ .x  %>%
+                           rename(!! .y := clim.var)
+  )
 
-monthly.clim[c("ColdestDay.csv")]
-tree.rings[["P480_1"]]
+  clim.sel.merged <- reduce(clim.sel, left_join, by = c("year", "month"))
+  print(head(clim.sel.merged, 5))
+  
+  response <- dcc(dplR::chron(rings), clim.sel.merged)
+  
+  fig <- plot(response) + scale_color_manual(values = c("steelblue", "tomato3", "darkolivegreen", "coral"))
+  plot(fig)
+  return(list(response, fig))
+}
+names(monthly.clim)
+
+response_curve_analysis("P480_1", c("Tmean", "Tmin", "Tmax"), monthly.clim, tree.rings)
+response_curve_analysis("P480_2", c("Tmean", "Tmin", "Tmax"), monthly.clim, tree.rings)
+response_curve_analysis("P480_3", c("Tmean", "Tmin", "Tmax"), monthly.clim, tree.rings)
+
+var.sel <- names(monthly.clim)[c(19, 16, 1,20)] #  2,4,8,9,10
+
+var.comb <- list(names(monthly.clim)[1:2], names(monthly.clim)[3:4])
+response_curve_analysis(plot.data$Plot[1], names(monthly.clim)[2], monthly.clim, tree.rings)
+
+
+plot.data$Plot
+names(monthly.clim)[1]
+
+response_curve_analysis(plot.data$Plot[1], var.sel, monthly.clim, tree.rings)
+
+
+lapply(plot.data$Plot, function(p) {
+  rca.output <- response_curve_analysis(p, var.sel, monthly.clim, tree.rings)
+  write_rds(rca.output, paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/ResponseCurveAnalysis/", p, "-RespCurvAn.rds"))
+  png(filename = paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/ResponseCurveAnalysis/Figures/", p, ".png"))
+  plot(rca.output[[2]])
+  dev.off()
+})
+
+
+
+
 
  ## 
 clim <- monthly.clim[[1]]
@@ -626,6 +667,89 @@ print(final_df)
 
 write_csv(final_df, "/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Elevation/el.csv")
 
+
+#####TESTJun25
+
+data.ring.av <- data.master %>% 
+  filter(Stage == "adult") %>% 
+  select(tree, Plot, Bin, age, Longitude, Latitude,
+         last10, last20, last30, last40, last50,
+         first10, first20, first30, first40, first50)
+  
+
+plot(data.ring.av$Latitude, data.ring.av$first20)
+
+
+
+initial_ring_growth <- function(file) {
+  ## Read in the file
+  if(substr(file, nchar(file)-2, nchar(file)) == "rwl") {
+    ring.data.raw <- read.rwl(file, format="tucson") %>% 
+      mutate(year=rownames(ring.data.raw))
+  } else {if(substr(file, nchar(file)-2, nchar(file)) == "csv") {
+    ring.data.raw <- read_csv(file)
+  } }
+  
+  print(head(ring.data.raw, n=20L))
+  
+  ## Get growth indices for last 10, 20 to 50 years:
+  growth_indices <- ring.data.raw %>% 
+    pivot_longer(cols = -year, names_to = "Plot", values_to = "Width") %>% 
+    group_by(Plot) %>% 
+    summarise(first40 = head(na.omit(Width), 40)) %>% 
+    mutate(years = 1:40) %>% 
+    group_by(years) %>% 
+    summarise(rwi = mean(first40))
+  
+}
+
+a <- initial_ring_growth(files.csv[3])
+
+
+
+plot(a$years, a$rwi)
+
+first40 <- setNames(lapply(files.csv[-c(3)], FUN = initial_ring_growth),
+                                      substring(basename(files.csv[-c(3)]), 1, 6))
+
+b <- bind_rows(first40) %>% 
+  mutate(bin = rep(substring(basename(files.csv[-c(3)]), 1, 4), each=40))
+
+bg <- b %>% 
+  group_by(bin, years) %>% 
+  summarise(rwi = mean(rwi))
+  
+plot(bg %>% filter(bin=="P460") %>% pull(years), 
+     bg %>% filter(bin=="P460") %>% pull(rwi))
+
+plot(bg %>% filter(bin=="P465") %>% pull(years), 
+     bg %>% filter(bin=="P465") %>% pull(rwi))
+
+plot(bg %>% filter(bin=="P470") %>% pull(years), 
+     bg %>% filter(bin=="P470") %>% pull(rwi))
+
+plot(bg %>% filter(bin=="P475") %>% pull(years), 
+     bg %>% filter(bin=="P475") %>% pull(rwi))
+
+plot(bg %>% filter(bin=="P480") %>% pull(years), 
+     bg %>% filter(bin=="P480") %>% pull(rwi))
+
+coef1 <- lm(bg %>% filter(bin=="P460") %>% pull(rwi) ~ bg %>% filter(bin=="P460") %>% pull(years)) %>% 
+  coef()
+coef2 <- lm(bg %>% filter(bin=="P465") %>% pull(rwi) ~ bg %>% filter(bin=="P465") %>% pull(years)) %>% 
+  coef()
+coef3 <- lm(bg %>% filter(bin=="P470") %>% pull(rwi) ~ bg %>% filter(bin=="P470") %>% pull(years)) %>% 
+  coef()
+coef4 <- lm(bg %>% filter(bin=="P475") %>% pull(rwi) ~ bg %>% filter(bin=="P475") %>% pull(years)) %>% 
+  coef()
+coef5 <- lm(bg %>% filter(bin=="P480") %>% pull(rwi) ~ bg %>% filter(bin=="P480") %>% pull(years)) %>% 
+  coef()
+
+summary(lm(bg %>% filter(bin=="P460") %>% pull(rwi) ~ bg %>% filter(bin=="P460") %>% pull(years)))
+summary(lm(bg %>% filter(bin=="P465") %>% pull(rwi) ~ bg %>% filter(bin=="P465") %>% pull(years)))
+summary(lm(bg %>% filter(bin=="P470") %>% pull(rwi) ~ bg %>% filter(bin=="P470") %>% pull(years)))
+summary(lm(bg %>% filter(bin=="P475") %>% pull(rwi) ~ bg %>% filter(bin=="P475") %>% pull(years)))
+summary(lm(bg %>% filter(bin=="P480") %>% pull(rwi) ~ bg %>% filter(bin=="P480") %>% pull(years)))
 
 
 
