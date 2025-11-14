@@ -322,7 +322,7 @@ coords <- plot.data %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
 
 data.rings.480.1 <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/P480_1-Detrended-ModNegExp.csv")
-clim.TN <- read_csv("/Users/lukas/Downloads/meanT/tg_mean.csv")
+clim.TN <- read_csv(" ")
 clim.PN <- read_csv("/Users/lukas/Downloads/Prectot/prcptot.csv")
 clim.TS <- read_csv("/Users/lukas/Downloads/Tmean/tg_mean.csv")
 clim.PS <- read_csv("/Users/lukas/Downloads/TotalPrec/prcptot.csv")
