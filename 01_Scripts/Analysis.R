@@ -489,3 +489,153 @@ data_long %>%
   geom_errorbar(aes(ymin = Mean-SE, ymax = Mean+SE), width = 0.2) +
   theme_minimal()
 
+
+# Check pH range and distribution
+summary(data.cca$pH)
+hist(data.cca$pH)
+
+# Option 1: Recreate data_long from data.cca (cleanest)
+data_long <- data.cca %>%
+  select(Tree, Plot, Bin, Stage, Latitude, Longitude, Elevation, Slope, Exposure,
+         LeafArea, diameter, age, pH, soil_class,  # Added age, pH, soil_class
+         V_cmax, J_max) %>%
+  pivot_longer(cols = c(V_cmax, J_max),
+               names_to = "Parameter",
+               values_to = "Value") %>%
+  drop_na(Value) %>%  # Keep rows with valid Vcmax/Jmax
+  mutate(
+    Parameter = factor(Parameter),
+    Stage = factor(Stage),
+    Exposure = factor(Exposure),
+    Bin = factor(Bin),
+    Plot = factor(Plot),
+    Tree = factor(Tree),
+    Slope = factor(Slope),
+    soil_class = factor(soil_class)
+  )
+
+# Now test
+mv_model_pH <- lme(
+  Value ~ Parameter * (Slope + pH),
+  random = ~1 | Bin,
+  weights = varIdent(form = ~1|Parameter),
+  data = data_long
+)
+anova(mv_model_pH)
+
+# Test 1: Main effect
+mv_model_pH <- lme(
+  Value ~ Parameter * (Slope + pH),
+  random = ~1 | Bin,
+  weights = varIdent(form = ~1|Parameter),
+  data = data_long
+)
+
+# Test 2: Does pH modify slope effect?
+mv_model_pH_int <- lme(
+  Value ~ Parameter * (Slope * pH),  # Interaction
+  random = ~1 | Bin,
+  weights = varIdent(form = ~1|Parameter),
+  data = data_long
+)
+
+anova(mv_model_pH_int)
+
+mv_model_full <- lme(
+  Value ~ Parameter * (Slope + pH + age),
+  random = ~1 | Bin,
+  weights = varIdent(form = ~1|Parameter),
+  data = data_long %>% filter(Stage == "adult")  # age only for adults
+)
+
+anova(mv_model_full)
+
+## Decline per decade?
+# Quick check
+data.all %>% 
+  filter(Stage == "adult") %>%
+  summarize(cor_age_vcmax = cor(age, V_cmax, use="complete.obs"))
+
+data.all %>% filter(Stage == "adult") %>%
+  group_by(Slope) %>%
+  summarize(
+    mean_age = mean(age, na.rm=T),
+    sd_age = sd(age, na.rm=T),
+    n = n()
+  )
+
+# Visual check
+boxplot(age ~ Slope, data = data.all %>% filter(Stage == "adult"))
+
+# Stats
+anova(lm(age ~ Slope, data = data.all %>% filter(Stage == "adult")))
+
+
+##### Soil texture
+# Check texture distribution by slope
+table(data.all$Slope, data.all$soil_class)
+
+mv_model_texture <- lme(
+  Value ~ Parameter * (Slope + soil_class + age),
+  random = ~1 | Bin,
+  weights = varIdent(form = ~1|Parameter),
+  data = data_long %>% filter(Stage == "adult")
+)
+anova(mv_model_texture)
+
+
+# 1. Post-hoc: Which textures differ?
+library(emmeans)
+emmeans(mv_model_texture, pairwise ~ soil_class, at = list(Parameter = "V_cmax"))
+
+# 2. Test slope×texture interaction
+mv_model_texture_int <- lme(
+  Value ~ Parameter * (Slope * soil_class + age),
+  random = ~1 | Bin,
+  weights = varIdent(form = ~1|Parameter),
+  data = data_long %>% filter(Stage == "adult")
+)
+anova(mv_model_texture_int)
+
+# 3. Visual check - does texture matter WITHIN slope B (the only testable slope)?
+data.all %>% 
+  filter(Stage == "adult", Slope == "B") %>%
+  group_by(soil_class) %>%
+  summarize(
+    mean_Vcmax = mean(V_cmax, na.rm=T),
+    n = n()
+  )
+
+boxplot(V_cmax ~ soil_class, 
+        data = data.all %>% filter(Stage == "adult", Slope == "B"),
+        main = "Vcmax by texture (Slope B only)")
+
+
+#### Is there confounding:
+# Slope B is the only one with texture variation
+data.all %>% 
+  filter(Stage == "adult", Slope == "B") %>%
+  group_by(soil_class) %>%
+  summarize(
+    mean_Vcmax = mean(V_cmax, na.rm=T),
+    sd_Vcmax = sd(V_cmax, na.rm=T),
+    n = n()
+  )
+
+# Stats within Slope B only
+slope_b_test <- lm(V_cmax ~ soil_class + age, 
+                   data = data.all %>% filter(Stage == "adult", Slope == "B"))
+summary(slope_b_test)
+anova(slope_b_test)
+
+
+
+##### Final model
+
+# Your robust model
+mv_model_final <- lme(
+  Value ~ Parameter * (Slope + Latitude + age),
+  random = ~1 | Bin,
+  weights = varIdent(form = ~1|Parameter),
+  data = data_long %>% filter(Stage == "adult")
+)

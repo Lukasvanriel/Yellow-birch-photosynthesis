@@ -830,7 +830,172 @@ summary_stats <- data.frame(
 
 
 
+######## DCC for multiple variables
+# ============================================
+# PHASE 2 EXPANSION: Multi-variable Climate Analysis
+# ============================================
 
+library(tidyverse)
+library(treeclim)
+library(dplR)
+
+# ============================================
+# SETUP: Load data
+# ============================================
+
+clim.files <- list.files("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/ClimateData/Monthly", 
+                         pattern = "\\.csv", full.names = TRUE)
+
+monthly.clim <- lapply(clim.files, FUN = read_csv)
+names(monthly.clim) <- substr(basename(clim.files), 1, nchar(basename(clim.files)) - 4)
+
+tree.rings <- lapply(plot.data$Plot, FUN = function(p) { 
+  read_csv(paste0("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Processed/TreeCores-Detrended/", 
+                  p, "-Detrended-ModNegExp.csv"))
+})
+names(tree.rings) <- plot.data$Plot
+
+# Variable definitions
+var_to_file <- c(
+  Tmean = "Tmean",
+  Tmin = "Tmin", 
+  Tmax = "Tmax",
+  GrowingDays = "CumulatDaysAbove0",
+  ColdestDay = "ColdestDay",
+  ColdDays15 = "Tmin-15",
+  ColdDays25 = "Tmin-25",
+  HottestDay = "HottestDay",
+  HeatDays32 = "Tmax32",
+  TotPrecip = "TotPrec",
+  WetDays10 = "WetDays10mm",
+  MaxPrecip1d = "MaxTotPrec1"
+)
+
+clim.data <- lapply(var_to_file, function(fname) {
+  monthly.clim[[fname]]
+})
+names(clim.data) <- names(var_to_file)
+
+# ============================================
+# ANALYSIS 1: CORRELATION METHOD (All 12 variables)
+# ============================================
+# ============================================
+# SIMPLIFIED APPROACH: Correlation only, then targeted response
+# ============================================
+
+# First, get correlation working with shorter window
+cat("\n=== STEP 1: Correlation analysis ===\n")
+
+# ============================================
+# SIMPLIFIED: Test each variable separately
+# ============================================
+
+climate_sensitivity_individual <- data.frame()
+
+for (var_name in names(var_to_file)) {
+  cat("\n--- Testing", var_name, "---\n")
+  
+  for (plot_name in plot.data$Plot) {
+    cat(plot_name, "...")
+    
+    tryCatch({
+      # Prepare data
+      rings <- tree.rings[[plot_name]] %>% column_to_rownames("year")
+      
+      # Get ONLY this climate variable
+      clim_single <- clim.data[[var_name]] %>%
+        rename(clim.var = matches("^ssp245.*_p50$")) %>%
+        select(Plot, year, month, clim.var) %>%
+        filter(Plot == plot_name) %>%
+        select(-Plot) %>%
+        arrange(year, month) %>%
+        rename(!!var_name := clim.var) %>%
+        as.data.frame()
+      
+      # Run dcc for this one variable
+      dcc_single <- dcc(dplR::chron(rings), clim_single,
+                        method = "correlation",
+                        selection = -6:9,  # Full window works with 1 variable
+                        var_names = var_name)
+      
+      # Extract summer correlation
+      coef_df <- dcc_single$coef
+      summer_rows <- grep("curr\\.(jun|jul|aug)", 
+                          rownames(coef_df), ignore.case = TRUE)
+      
+      if (length(summer_rows) > 0) {
+        summer_cor <- mean(coef_df[summer_rows, "coef"], na.rm = TRUE)
+        
+        climate_sensitivity_individual <- rbind(
+          climate_sensitivity_individual,
+          data.frame(
+            Plot = plot_name,
+            Variable = var_name,
+            Summer_cor = summer_cor
+          )
+        )
+      }
+      
+      cat(" ✓")
+      
+    }, error = function(e) {
+      cat(" FAILED:", e$message)
+    })
+  }
+  cat("\n")
+}
+
+# Fix plot names and reshape
+climate_sensitivity_individual$Plot <- gsub("_", ".", climate_sensitivity_individual$Plot)
+
+climate_wide <- climate_sensitivity_individual %>%
+  pivot_wider(names_from = Variable, 
+              values_from = Summer_cor,
+              names_prefix = "Sens_")
+
+# Merge with physiology
+phys_climate_full <- phys_growth %>%
+  left_join(climate_wide, by = "Plot")
+
+# Compare which variable best predicts Vcmax
+corr_results <- data.frame(
+  Variable = names(var_to_file),
+  Cor_with_Vcmax = sapply(names(var_to_file), function(v) {
+    col_name <- paste0("Sens_", v)
+    if (col_name %in% names(phys_climate_full)) {
+      cor(phys_climate_full$Mean_Vcmax, 
+          phys_climate_full[[col_name]], 
+          use = "complete.obs")
+    } else NA
+  }),
+  p_value = sapply(names(var_to_file), function(v) {
+    col_name <- paste0("Sens_", v)
+    if (col_name %in% names(phys_climate_full)) {
+      test <- cor.test(phys_climate_full$Mean_Vcmax, 
+                       phys_climate_full[[col_name]])
+      test$p.value
+    } else NA
+  })
+) %>%
+  arrange(desc(abs(Cor_with_Vcmax)))
+
+cat("\n=== RESULTS ===\n")
+print(corr_results)
+
+# Visualize
+ggplot(corr_results, 
+       aes(x = reorder(Variable, Cor_with_Vcmax), 
+           y = Cor_with_Vcmax)) +
+  geom_col(aes(fill = p_value < 0.05)) +
+  coord_flip() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_fill_manual(values = c("gray70", "steelblue"),
+                    name = "p < 0.05") +
+  labs(x = NULL, 
+       y = "Correlation: Climate Sensitivity → Vcmax",
+       title = "Which climate variable best predicts photosynthetic capacity?",
+       subtitle = "Climate sensitivity (summer growth response) vs mean Vcmax by plot") +
+  theme_minimal()
 
 
 
@@ -985,4 +1150,21 @@ ggplot(tree_summaries, aes(x = factor(bin), y = mean)) +
   geom_boxplot() +
   labs(x = "Latitude", y = "Coefficient of Variation (CV)") +
   theme_minimal()
+
+
+
+###What about the age effect? Do older trees show diff climate sens indep. of ther Vcmax?
+# Calculate plot-level mean age
+plot_age <- data.all %>%
+  filter(Stage == "adult") %>%
+  group_by(Plot) %>%
+  summarize(Mean_age = mean(age, na.rm=T))
+
+phys_growth <- phys_growth %>%
+  left_join(plot_age, by = "Plot")
+
+# Test
+lm_age <- lm(Summer_temp_cor ~ Mean_Vcmax + Slope + Latitude + Mean_age, 
+             data = phys_growth)
+summary(lm_age)
 
