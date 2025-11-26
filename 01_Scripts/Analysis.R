@@ -15,6 +15,8 @@ data.all <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMon
 elevation <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Elevation/el.csv")
 soil <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-SoilLayers.csv") 
 plot <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-PlotInfo.csv") 
+comm.tree <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP_TreeCommunity.csv")
+comm.under <- read_csv("/Users/lukas/Library/CloudStorage/OneDrive-UniversitedeMontreal/Data/Ch2/Final_Database/YBP-UnderstoryCommunity.csv")
 
 ### Wrangle:
 data.all <- data.all %>% 
@@ -53,6 +55,23 @@ data.cca <- data.all %>%
   mutate(Exposure = factor(Exposure),
          Slope = factor(Slope)) 
 
+
+comm.tree.summ <- comm.tree %>% 
+  select(-Plot) %>% 
+  decostand(method = "hellinger") %>% 
+  bind_cols(select(comm.tree, Plot)) %>% 
+  relocate(Plot, .before = everything()) %>% 
+  mutate(
+    Bin = factor(format(round(as.numeric(substring(comm.tree$Plot, 2, 4)) / 10, 1), nsmall = 1))
+  )
+
+comm.under.summ <- comm.under %>% 
+  select(-Plot) %>% 
+  decostand(method = "hellinger") %>% 
+  bind_cols(select(comm.under, Plot)) %>% 
+  mutate(
+    Bin = factor(format(round(as.numeric(substring(comm.tree$Plot, 2, 4)) / 10, 1), nsmall = 1))
+  )
 
 
 ##### Functions #####
@@ -177,6 +196,33 @@ plot(rda_model, scaling = 2)
 
 #######LMM
 library(nlme)
+
+# Simple correlation
+cor.test(data.all$V_cmax, data.all$J_max)
+
+# Visualize
+plot(data.all$V_cmax, data.all$J_max, 
+     xlab = "Vcmax", ylab = "Jmax",
+     main = "Correlation between Vcmax and Jmax")
+abline(lm(J_max ~ V_cmax, data = data.all), col = "red")
+
+# With ggplot
+library(ggplot2)
+ggplot(data.all, aes(V_cmax, J_max)) +
+  geom_point(aes(color = Stage), size = 2) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(x = "Vcmax (µmol/m²/s)", 
+       y = "Jmax (µmol/m²/s)",
+       title = "Vcmax-Jmax Coordination") +
+  theme_minimal()
+
+# By group if you want
+data.all %>%
+  group_by(Stage) %>%
+  summarize(Correlation = cor(V_cmax, J_max),
+            N = n())
+
+## OK so absolutely necessary to use multivariate technique
 
 # Create long format
 data_long <- data.all %>%
@@ -639,3 +685,4 @@ mv_model_final <- lme(
   weights = varIdent(form = ~1|Parameter),
   data = data_long %>% filter(Stage == "adult")
 )
+
